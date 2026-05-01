@@ -14,14 +14,15 @@
 bl_info = {
     "name": "Any Rig to Rigify",
     "author": "demania",
-    "description": "",
-    "blender": (3, 0, 0),
-    "version": (0, 0, 3),
+    "description": "Convert arbitrary armatures to Rigify with Blender 4.x/5.x compatibility.",
+    "blender": (4, 0, 0),
+    "version": (0, 1, 0),
     "location": "View3D",
     "warning": "",
     "category": "Object",
 }
 
+from . import ui
 from .ui import (
     # CustomPanel,
     ObjectOperator,

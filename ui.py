@@ -4,12 +4,60 @@ from bpy.props import (StringProperty,
                        BoolProperty,
                        EnumProperty,
                        )
+from pathlib import Path
 import os
 import json
 import bpy
-import addon_utils
 
 # ===========================================================
+
+
+def get_selected_armature(context):
+    active_object = context.active_object
+    if active_object is not None and active_object.type == "ARMATURE":
+        return active_object
+
+    for obj in context.selected_objects:
+        if obj.type == "ARMATURE":
+            return obj
+
+    return None
+
+
+def get_bone_status(context, bone_name):
+    armature = get_selected_armature(context)
+    if armature is None:
+        return "missing_armature"
+
+    if bone_name and bone_name in armature.data.bones:
+        return "found"
+
+    return "missing_bone"
+
+
+def draw_bone_status(layout, context, bone_name):
+    status = get_bone_status(context, bone_name)
+    status_row = layout.row()
+
+    if status == "missing_armature":
+        status_row.enabled = False
+        status_row.label(text="Kein Skelett ausgewählt", icon="INFO")
+        return
+
+    if status == "found":
+        status_row.label(text="Knochen gefunden", icon="CHECKMARK")
+        return
+
+    status_row.alert = True
+    status_row.label(
+        text="Knochen existiert im aktuellen Skelett nicht",
+        icon="ERROR",
+    )
+
+
+def draw_bone_prop_with_status(layout, context, scene, prop_name):
+    layout.prop(scene, prop_name)
+    draw_bone_status(layout, context, getattr(scene, prop_name))
 
 
 def generate_rig(self, objects, params):
@@ -39,22 +87,9 @@ def generate_rig(self, objects, params):
 
 
 def get_mapping_folder():
-    for mod in addon_utils.modules():
-        if mod.bl_info['name'] == "Any Rig to Rigify":
-            filepath = mod.__file__
-        else:
-            pass
-    filepath = filepath.replace("__init__.py", "")
-    filepath = filepath.replace("\\", "/")
-    mapping_folder = f"{filepath}/mapping_templates"
-    # if os.path.isdir(mapping_folder) == False:
-    #     make_dir_cmd = f"mkdir mapping_templates"
-    #     os.system(make_dir_cmd)
-    # path clean-up
-    mapping_folder = mapping_folder.replace("\\", "/")
-    mapping_folder = mapping_folder.replace("//", "/")
-
-    return mapping_folder
+    mapping_folder = Path(__file__).resolve().parent / "mapping_templates"
+    mapping_folder.mkdir(parents=True, exist_ok=True)
+    return mapping_folder.as_posix()
 
 # ===========================================================
 
@@ -64,7 +99,7 @@ def my_settings_callback(scene, context):
     mapping_folder = get_mapping_folder()
 
     json_presets = []
-    files = os.listdir(mapping_folder)
+    files = sorted(os.listdir(mapping_folder))
     # get only json files
     for file in files:
         _, file_extension = os.path.splitext(file)
@@ -499,7 +534,7 @@ class MappingSaveOperator(Operator):
             json_path = f"{mapping_folder}/{json_file_name}"
 
             # Writing to sample.json
-            with open(json_path, "w") as outfile:
+            with open(json_path, "w", encoding="utf-8") as outfile:
                 outfile.write(json_object)
             context.scene.json_file_name = ""
             self.report({"INFO"}, f"{context.scene.presets} preset saved")
@@ -520,7 +555,7 @@ class MappingImportOperator(Operator):
     def execute(self, context):
         json_file = f"{get_mapping_folder()}/{context.scene.presets}"
         # Opening JSON file
-        with open(json_file) as json_file:
+        with open(json_file, encoding="utf-8") as json_file:
             data = json.load(json_file)
 
         context.scene.head = data["head"]
@@ -811,11 +846,8 @@ class UPPER_BODY_panel(bpy.types.Panel):
         scn = context.scene
 
         box = layout.box()
-        box.prop(scn, "head")
-        box.prop(scn, "first_neck")
-        box.prop(scn, "last_neck")
-        box.prop(scn, "clav_r")
-        box.prop(scn, "clav_l")
+        for prop_name in ["head", "first_neck", "last_neck", "clav_r", "clav_l"]:
+            draw_bone_prop_with_status(box, context, scn, prop_name)
 # ===========================================================
 
 
@@ -835,8 +867,8 @@ class SPINES_panel(bpy.types.Panel):
         row.label(text='Spines')
 
         box = layout.box()
-        box.prop(scn, "first_spine")
-        box.prop(scn, "last_spine")
+        for prop_name in ["first_spine", "last_spine"]:
+            draw_bone_prop_with_status(box, context, scn, prop_name)
 
 # ===========================================================
 
@@ -855,12 +887,15 @@ class ARMS_panel(bpy.types.Panel):
 
         box = layout.box()
 
-        box.prop(scn, "uparm_r")
-        box.prop(scn, "lowarm_r")
-        box.prop(scn, "hand_r")
-        box.prop(scn, "uparm_l")
-        box.prop(scn, "lowarm_l")
-        box.prop(scn, "hand_l")
+        for prop_name in [
+            "uparm_r",
+            "lowarm_r",
+            "hand_r",
+            "uparm_l",
+            "lowarm_l",
+            "hand_l",
+        ]:
+            draw_bone_prop_with_status(box, context, scn, prop_name)
 
 
 # ===========================================================
@@ -882,49 +917,55 @@ class FINGERS_panel(bpy.types.Panel):
         box = layout.box()
         box.prop(scn, "fingers_bool_r")
         if scn.fingers_bool_r == True:
-            box.prop(scn, "thumb_01_r")
-            box.prop(scn, "thumb_02_r")
-            box.prop(scn, "thumb_03_r")
-            box.prop(scn, "palm_index_r")
-            box.prop(scn, "index_01_r")
-            box.prop(scn, "index_02_r")
-            box.prop(scn, "index_03_r")
-            box.prop(scn, "palm_middle_r")
-            box.prop(scn, "middle_01_r")
-            box.prop(scn, "middle_02_r")
-            box.prop(scn, "middle_03_r")
-            box.prop(scn, "palm_ring_r")
-            box.prop(scn, "ring_01_r")
-            box.prop(scn, "ring_02_r")
-            box.prop(scn, "ring_03_r")
-            box.prop(scn, "palm_pinky_r")
-            box.prop(scn, "pinky_01_r")
-            box.prop(scn, "pinky_02_r")
-            box.prop(scn, "pinky_03_r")
+            for prop_name in [
+                "thumb_01_r",
+                "thumb_02_r",
+                "thumb_03_r",
+                "palm_index_r",
+                "index_01_r",
+                "index_02_r",
+                "index_03_r",
+                "palm_middle_r",
+                "middle_01_r",
+                "middle_02_r",
+                "middle_03_r",
+                "palm_ring_r",
+                "ring_01_r",
+                "ring_02_r",
+                "ring_03_r",
+                "palm_pinky_r",
+                "pinky_01_r",
+                "pinky_02_r",
+                "pinky_03_r",
+            ]:
+                draw_bone_prop_with_status(box, context, scn, prop_name)
 
 
         # left fingers
         box.prop(scn, "fingers_bool_l")
         if scn.fingers_bool_l == True:
-            box.prop(scn, "thumb_01_l")
-            box.prop(scn, "thumb_02_l")
-            box.prop(scn, "thumb_03_l")
-            box.prop(scn, "palm_index_l")
-            box.prop(scn, "index_01_l")
-            box.prop(scn, "index_02_l")
-            box.prop(scn, "index_03_l")
-            box.prop(scn, "palm_middle_l")
-            box.prop(scn, "middle_01_l")
-            box.prop(scn, "middle_02_l")
-            box.prop(scn, "middle_03_l")
-            box.prop(scn, "palm_ring_l")
-            box.prop(scn, "ring_01_l")
-            box.prop(scn, "ring_02_l")
-            box.prop(scn, "ring_03_l")
-            box.prop(scn, "palm_pinky_l")
-            box.prop(scn, "pinky_01_l")
-            box.prop(scn, "pinky_02_l")
-            box.prop(scn, "pinky_03_l")
+            for prop_name in [
+                "thumb_01_l",
+                "thumb_02_l",
+                "thumb_03_l",
+                "palm_index_l",
+                "index_01_l",
+                "index_02_l",
+                "index_03_l",
+                "palm_middle_l",
+                "middle_01_l",
+                "middle_02_l",
+                "middle_03_l",
+                "palm_ring_l",
+                "ring_01_l",
+                "ring_02_l",
+                "ring_03_l",
+                "palm_pinky_l",
+                "pinky_01_l",
+                "pinky_02_l",
+                "pinky_03_l",
+            ]:
+                draw_bone_prop_with_status(box, context, scn, prop_name)
 
 # ===========================================================
 
@@ -943,13 +984,16 @@ class LEGS_panel(bpy.types.Panel):
 
         box = layout.box()
 
-        box.prop(scn, "thigh_r")
-        box.prop(scn, "calf_r")
-        box.prop(scn, "foot_r")
-        box.prop(scn, "toe_r")
-        box.prop(scn, "heel_r")
-        box.prop(scn, "thigh_l")
-        box.prop(scn, "calf_l")
-        box.prop(scn, "foot_l")
-        box.prop(scn, "toe_l")
-        box.prop(scn, "heel_l")
+        for prop_name in [
+            "thigh_r",
+            "calf_r",
+            "foot_r",
+            "toe_r",
+            "heel_r",
+            "thigh_l",
+            "calf_l",
+            "foot_l",
+            "toe_l",
+            "heel_l",
+        ]:
+            draw_bone_prop_with_status(box, context, scn, prop_name)

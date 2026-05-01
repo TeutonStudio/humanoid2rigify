@@ -1,5 +1,6 @@
 import bpy
 import rigify
+import math
 from mathutils import Matrix, Vector
 
 # # bpy.ops.object.select_all(action="DESELECT")
@@ -8,6 +9,27 @@ from mathutils import Matrix, Vector
 
 EXTERNAL_RIG_NAME = ""
 RIGIFY_NAME = "_rigify"
+
+LEGACY_LAYER_TO_COLLECTION = {
+    0: "Face",
+    3: "Torso",
+    5: "Fingers",
+    6: "Fingers (Detail)",
+    7: "Arm.L (IK)",
+    8: "Arm.L (FK)",
+    9: "Arm.L (Tweak)",
+    10: "Arm.R (IK)",
+    11: "Arm.R (FK)",
+    12: "Arm.R (Tweak)",
+    13: "Leg.L (IK)",
+    14: "Leg.L (FK)",
+    15: "Leg.L (Tweak)",
+    16: "Leg.R (IK)",
+    17: "Leg.R (FK)",
+    18: "Leg.R (Tweak)",
+    27: "Additional",
+    31: "Root",
+}
 
 
 # ===========================================================
@@ -41,6 +63,77 @@ def delete_garbage():
     for block in bpy.data.materials:
         if block.users == 0:
             bpy.data.materials.remove(block)
+
+
+def ensure_rigify_enabled():
+    if "rigify" not in bpy.context.preferences.addons:
+        bpy.ops.preferences.addon_enable(module="rigify")
+
+
+def uses_bone_collections(armature_data):
+    return hasattr(armature_data, "collections_all")
+
+
+def get_collection_name(layer_index):
+    return LEGACY_LAYER_TO_COLLECTION.get(layer_index, f"Layer {layer_index + 1}")
+
+
+def get_or_create_bone_collection(armature_data, layer_index):
+    collection_name = get_collection_name(layer_index)
+    bone_collection = armature_data.collections_all.get(collection_name)
+    if bone_collection is None:
+        bone_collection = armature_data.collections.new(collection_name)
+    bone_collection.is_visible = True
+    return bone_collection
+
+
+def assign_bone_to_layer_group(obj, bone_name, layer_index):
+    armature_data = obj.data
+    if uses_bone_collections(armature_data):
+        bone = armature_data.bones.get(bone_name)
+        if bone is None:
+            return
+
+        target_collection = get_or_create_bone_collection(
+            armature_data, layer_index)
+        for collection in armature_data.collections_all:
+            collection.unassign(bone)
+        target_collection.assign(bone)
+        return
+
+    bone = armature_data.bones.get(bone_name)
+    if bone is None:
+        return
+
+    bone.layers[layer_index] = True
+    for cnt in range(0, 32):
+        if cnt != layer_index:
+            bone.layers[cnt] = False
+
+
+def set_visible_rig_layers(obj, layer_indices):
+    armature_data = obj.data
+    if uses_bone_collections(armature_data):
+        visible_collections = {
+            get_collection_name(layer_index) for layer_index in layer_indices
+        }
+        for collection in armature_data.collections_all:
+            collection.is_visible = collection.name in visible_collections
+        return
+
+    for nr in range(0, 32):
+        armature_data.layers[nr] = nr in layer_indices
+
+
+def set_rigify_layer_param(rigify_param, attr_name, layer_index):
+    if not hasattr(rigify_param, attr_name):
+        return
+
+    layer_config = getattr(rigify_param, attr_name)
+    if hasattr(layer_config, "__len__") and not isinstance(layer_config, bool):
+        for cnt in range(0, len(layer_config)):
+            layer_config[cnt] = False
+        layer_config[layer_index] = True
 
 
 # ===========================================================
@@ -385,6 +478,8 @@ def clean_bones_between():
 
 
 def the_script(skeleton_model, parameters):
+    ensure_rigify_enabled()
+
     # set 3d cursor to (0,0,0)
     bpy.context.scene.cursor.location = (0, 0, 0)
 
@@ -1185,16 +1280,6 @@ def the_script(skeleton_model, parameters):
         heel_r: 16,
     }
 
-    # adding bones to layer
-    bpy.ops.object.mode_set(mode="POSE")
-    for i in layer_bones:
-        if bone in all_metarig_bone_names:
-            context_bone = bpy.context.object.data.bones[i]
-            context_bone.layers[0] = True
-            # disable all the other layers but layer[0]
-            for cnt in range(1, 32):
-                context_bone.layers[cnt] = False
-
     layer_bones[clav_r] = 3
     layer_bones[clav_l] = 3
     layer_bones["skeleton:torso_bone"] = 3
@@ -1258,13 +1343,7 @@ def the_script(skeleton_model, parameters):
     all_metarig_bone_names = get_all_bone_names(METARIG_OBJ)
     for i, layer in layer_bones.items():
         if i in all_metarig_bone_names:
-            context_bone = bpy.context.object.data.bones[i]
-            context_bone.layers[layer] = True
-
-            # disable all the other layers but the correct layer
-            for cnt in range(0, 32):
-                if cnt != layer:
-                    context_bone.layers[cnt] = False
+            assign_bone_to_layer_group(METARIG_OBJ, i, layer)
 
     # ===============================================================
     # add bones like dyn, clothes bones etc
@@ -1276,16 +1355,8 @@ def the_script(skeleton_model, parameters):
 
     # add extra bones to its layer
     if len(extra_bones) != 0:
-        METARIG_OBJ.data.rigify_layers[27].name = "Additional"
-        bpy.context.object.data.rigify_layers[27].group = 3
-        bpy.context.object.data.layers[27] = True
         for bone in extra_bones:
-            context_bone = bpy.context.object.data.bones[bone]
-            # disable all the other layers but the correct layer
-            context_bone.layers[27] = True
-            for cnt in range(0, 32):
-                if cnt != 27:
-                    context_bone.layers[cnt] = False
+            assign_bone_to_layer_group(METARIG_OBJ, bone, 27)
 
     # ===============================================================
     # fixing new_torso orinetation
@@ -1367,22 +1438,18 @@ def the_script(skeleton_model, parameters):
             pose_bone = METARIG_OBJ.pose.bones[bone]
             rigify_param = pose_bone.rigify_parameters
 
-            fk_layer = layer[0]
-            tweak_layer = layer[1]
+            fk_layer_index = layer[0]
+            tweak_layer_index = layer[1]
 
             # if bones has fk layer
             if layer[0] != None:
-                # disable all layers
-                for cnt in range(0, 32):
-                    rigify_param.fk_layers[cnt] = False
-                rigify_param.fk_layers[fk_layer] = True
+                set_rigify_layer_param(
+                    rigify_param, "fk_layers", fk_layer_index)
 
             # if bones doesn't have fk layer
             if layer[1] != None:
-                # disable all layers
-                for cnt in range(0, 32):
-                    rigify_param.tweak_layers[cnt] = False
-                rigify_param.tweak_layers[tweak_layer] = True
+                set_rigify_layer_param(
+                    rigify_param, "tweak_layers", tweak_layer_index)
 
     # remove rigify type on the root bone
     if "root" in all_metarig_bone_names:
@@ -1403,12 +1470,7 @@ def the_script(skeleton_model, parameters):
 
     # [!!!] DON'T delete layer 31
     layers = [0, 3, 6, 8, 11, 14, 17, 31]
-    # layers = [29, 31]
-    for nr in range(0, 32):
-        if nr in layers:
-            RIGIFY_OBJ.data.layers[nr] = True
-        else:
-            RIGIFY_OBJ.data.layers[nr] = False
+    set_visible_rig_layers(RIGIFY_OBJ, layers)
 
     # ===============================================================
     bpy.ops.object.mode_set(mode="OBJECT")
@@ -1635,12 +1697,7 @@ def the_script(skeleton_model, parameters):
 
     # # ===============================================================
     layers = [0, 3, 6, 8, 11, 14, 17, 27, 13, 16, 7, 10, 5]
-    # layers = [29, 31]
-    for nr in range(0, 32):
-        if nr in layers:
-            RIGIFY_OBJ.data.layers[nr] = True
-        else:
-            RIGIFY_OBJ.data.layers[nr] = False
+    set_visible_rig_layers(RIGIFY_OBJ, layers + [31])
     # # ===============================================================
 
     RIGIFY_OBJ.data.pose_position = "POSE"
