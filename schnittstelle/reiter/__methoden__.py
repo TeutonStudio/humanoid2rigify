@@ -57,19 +57,9 @@ def draw_bone_prop_with_status(layout, context, scene, prop_name):
     if armature is not None:
         schedule_bone_name_cache_refresh(scene, context)
 
-    if armature is not None and is_bone_name_cache_valid(scene, armature):
-        layout.prop_search(
-            scene,
-            prop_name,
-            scene,
-            "cached_bone_names",
-            text=prop_label,
-        )
-    else:
-        row = layout.row()
-        row.enabled = False
-        row.prop(scene, prop_name, text=prop_label)
-
-    if armature is not None and not is_bone_name_cache_valid(scene, armature):
-        row = layout.row()
-        row.prop(scene, prop_name, text=prop_label)
+    row = layout.row(align=True)
+    row.prop(scene, prop_name, text=prop_label)
+    pick_button = row.row(align=True)
+    pick_button.enabled = armature is not None and is_bone_name_cache_valid(scene, armature)
+    pick_op = pick_button.operator("opr.pick_scene_bone_prop", text="", icon="BONE_DATA")
+    pick_op.prop_name = prop_name

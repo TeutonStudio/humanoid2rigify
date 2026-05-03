@@ -25,7 +25,6 @@ _MERGE_WHITELIST_INIT_SCENE = None
 _BONE_NAME_CACHE_INIT_SCENE = None
 _BONE_NAME_CACHE_INIT_ARMATURE = None
 _BONE_NAME_CACHE = {}
-_WHITELIST_OPTION_CACHE = {}
 
 
 def get_current_armature(context):
@@ -100,22 +99,20 @@ def get_merge_whitelist_option_values(context):
     return option_values
 
 
-def get_merge_whitelist_items(self, context):
+def get_cached_bone_items(context):
+    scene = getattr(context, "scene", None) if context is not None else None
     armature_obj = get_current_armature(context)
-    cache_key = get_armature_cache_key(armature_obj)
-    option_values = _WHITELIST_OPTION_CACHE.get(cache_key)
-    if option_values is None:
-        option_values = tuple(get_merge_whitelist_option_values(context))
-        _WHITELIST_OPTION_CACHE.clear()
-        _WHITELIST_OPTION_CACHE[cache_key] = option_values
+    if armature_obj is None:
+        return []
 
-    current_value = getattr(self, "value", "")
-    if current_value and current_value not in option_values:
-        option_values = (current_value, *option_values)
+    if scene is not None and is_bone_name_cache_valid(scene, armature_obj):
+        bone_names = [item.name for item in scene.cached_bone_names]
+    else:
+        bone_names = list(get_cached_bone_names(armature_obj))
 
     return [
-        (value, value, value)
-        for value in option_values
+        (bone_name, bone_name, bone_name)
+        for bone_name in bone_names
     ]
 
 
@@ -133,7 +130,7 @@ def get_next_merge_whitelist_value(scene, context):
 
 
 class MergeWhitelistItem(bpy.types.PropertyGroup):
-    value: EnumProperty(name="Bone", items=get_merge_whitelist_items)
+    value: StringProperty(name="Value", default="")
 
 
 class CachedBoneNameItem(bpy.types.PropertyGroup):
@@ -206,7 +203,6 @@ def rebuild_bone_name_cache(scene, armature_obj):
 
     scene.cached_bone_names_armature = armature_obj.name
     scene.cached_bone_names_count = len(armature_obj.data.bones)
-    _WHITELIST_OPTION_CACHE.clear()
 
 
 def initialize_pending_bone_name_cache():
@@ -267,7 +263,6 @@ def unregister():
     _BONE_NAME_CACHE_INIT_SCENE = None
     _BONE_NAME_CACHE_INIT_ARMATURE = None
     _BONE_NAME_CACHE.clear()
-    _WHITELIST_OPTION_CACHE.clear()
     if bpy.app.timers.is_registered(initialize_pending_bone_name_cache):
         bpy.app.timers.unregister(initialize_pending_bone_name_cache)
     if bpy.app.timers.is_registered(initialize_pending_merge_whitelist):
@@ -280,7 +275,6 @@ def unregister():
 
 def register():
     _BONE_NAME_CACHE.clear()
-    _WHITELIST_OPTION_CACHE.clear()
     for cls in CLASSES:
         bpy.utils.register_class(cls)
     for (prop_name, prop_value) in PROPS:
