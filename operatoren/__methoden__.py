@@ -1,6 +1,6 @@
 import bpy
 
-from operatoren.erzeugung_dispatcher import dispatch_generation
+from .erzeugung_dispatcher import dispatch_generation
 
 
 def generate_rig(self, objects, params):

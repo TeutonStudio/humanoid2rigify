@@ -1,6 +1,6 @@
 import bpy
 
-from __methoden__ import get_mapping_folder
+from ..__methoden__ import get_mapping_folder
 
 
 class MappingRenameOperator(bpy.types.Operator):

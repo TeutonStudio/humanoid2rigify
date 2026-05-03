@@ -1,8 +1,8 @@
 import bpy
 
-from operatoren import any_rig_to_rigify_v2
-from operatoren.backup import create_backups
-from operatoren.rigify_access import (
+from . import any_rig_to_rigify_v2
+from .backup import create_backups
+from .rigify_access import (
     ensure_target_bone_from_source,
     get_generated_rigify_object,
     make_object_active,

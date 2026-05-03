@@ -1,7 +1,7 @@
 import bpy
 import os
 
-from __methoden__ import get_mapping_folder
+from ..__methoden__ import get_mapping_folder
 
 class MappingDeleteOperator(bpy.types.Operator):
 

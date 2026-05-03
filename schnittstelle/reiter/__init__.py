@@ -1,22 +1,15 @@
 import bpy
 
-from schnittstelle.reiter.erzeuger import GENERATE_panel
-from schnittstelle.reiter.zuordnung import MAPPING_panel
-from schnittstelle.reiter.torso import UPPER_BODY_panel
-from schnittstelle.reiter.wirbel import SPINES_panel
-from schnittstelle.reiter.arme import ARMS_panel
-from schnittstelle.reiter.finger import FINGERS_panel
-from schnittstelle.reiter.beine import LEGS_panel
-
+from . import arme, beine, erzeuger, finger, torso, wirbel, zuordnung
 
 _CLASSES = [
-    GENERATE_panel,
-    MAPPING_panel,
-    UPPER_BODY_panel,
-    SPINES_panel,
-    ARMS_panel,
-    FINGERS_panel,
-    LEGS_panel,
+    erzeuger.GENERATE_panel,
+    zuordnung.MAPPING_panel,
+    torso.UPPER_BODY_panel,
+    wirbel.SPINES_panel,
+    arme.ARMS_panel,
+    finger.FINGERS_panel,
+    beine.LEGS_panel,
 ]
 
 def register():

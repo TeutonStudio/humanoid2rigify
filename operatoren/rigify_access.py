@@ -1,7 +1,7 @@
 import bpy
 from mathutils import Vector
 
-from operatoren.any_rig_to_rigify_v2 import assign_bone_to_layer_group
+from .any_rig_to_rigify_v2 import assign_bone_to_layer_group
 
 
 def get_generated_rigify_name(source_armature):
@@ -92,4 +92,3 @@ def ensure_target_bone_from_source(context, rigify_obj, source_bone_name, target
     assign_bone_to_layer_group(rigify_obj, target_bone_name, 27)
     bpy.ops.object.mode_set(mode="OBJECT")
     return target_bone_name
-

@@ -1,14 +1,14 @@
 from dataclasses import dataclass, field
 
-from operatoren.bone_mapping import (
+from .bone_mapping import (
     build_extra_bone_data,
     build_standard_constraint_map,
     collect_extra_bones,
     derive_neck_data,
     derive_spine_data,
 )
-from operatoren.mesh_analyse import collect_bound_meshes
-from operatoren.vertex_groups import collect_weighted_vertex_group_names
+from .mesh_analyse import collect_bound_meshes
+from .vertex_groups import collect_weighted_vertex_group_names
 
 
 @dataclass

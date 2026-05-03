@@ -1,7 +1,28 @@
 import bpy
 
-from schnittstelle.reiter.__methoden__ import draw_bone_prop_with_status
+from .__methoden__ import draw_bone_prop_with_status
 
+FINGER = [
+    "thumb_01_",
+    "thumb_02_",
+    "thumb_03_",
+    "palm_index_",
+    "index_01_",
+    "index_02_",
+    "index_03_",
+    "palm_middle_",
+    "middle_01_",
+    "middle_02_",
+    "middle_03_",
+    "palm_ring_",
+    "ring_01_",
+    "ring_02_",
+    "ring_03_",
+    "palm_pinky_",
+    "pinky_01_",
+    "pinky_02_",
+    "pinky_03_",
+]
 
 class FINGERS_panel(bpy.types.Panel):
     bl_idname = "FINGERS_PT_panel"
@@ -17,54 +38,9 @@ class FINGERS_panel(bpy.types.Panel):
 
         # right fingers
         box = layout.box()
-        box.prop(scn, "fingers_bool_r")
-        if scn.fingers_bool_r == True:
-            for prop_name in [
-                "thumb_01_r",
-                "thumb_02_r",
-                "thumb_03_r",
-                "palm_index_r",
-                "index_01_r",
-                "index_02_r",
-                "index_03_r",
-                "palm_middle_r",
-                "middle_01_r",
-                "middle_02_r",
-                "middle_03_r",
-                "palm_ring_r",
-                "ring_01_r",
-                "ring_02_r",
-                "ring_03_r",
-                "palm_pinky_r",
-                "pinky_01_r",
-                "pinky_02_r",
-                "pinky_03_r",
-            ]:
-                draw_bone_prop_with_status(box, context, scn, prop_name)
-
-
-        # left fingers
-        box.prop(scn, "fingers_bool_l")
-        if scn.fingers_bool_l == True:
-            for prop_name in [
-                "thumb_01_l",
-                "thumb_02_l",
-                "thumb_03_l",
-                "palm_index_l",
-                "index_01_l",
-                "index_02_l",
-                "index_03_l",
-                "palm_middle_l",
-                "middle_01_l",
-                "middle_02_l",
-                "middle_03_l",
-                "palm_ring_l",
-                "ring_01_l",
-                "ring_02_l",
-                "ring_03_l",
-                "palm_pinky_l",
-                "pinky_01_l",
-                "pinky_02_l",
-                "pinky_03_l",
-            ]:
-                draw_bone_prop_with_status(box, context, scn, prop_name)
+        for seite in ["l","r"]:
+            prop = "fingers_bool_"+seite
+            box.prop(scn,prop)
+            if getattr(scn,prop) == True:
+                for prop_name in FINGER:
+                    draw_bone_prop_with_status(box, context, scn, prop_name+seite)

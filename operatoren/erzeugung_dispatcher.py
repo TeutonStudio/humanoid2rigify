@@ -1,9 +1,9 @@
-from operatoren import any_rig_to_rigify_v2
-from operatoren.backup import create_backups
-from operatoren.kontext import create_generation_context
-from operatoren.deform_modus import run_deform_mode
-from operatoren.verschmelzen_modus import run_merge_mode
-from operatoren.validierung import get_generation_blocker_message
+from . import any_rig_to_rigify_v2
+from .backup import create_backups
+from .kontext import create_generation_context
+from .deform_modus import run_deform_mode
+from .verschmelzen_modus import run_merge_mode
+from .validierung import get_generation_blocker_message
 
 
 MODE_CONSTRAINT_NEW_RIGIFY = "CONSTRAINT_NEW_RIGIFY"

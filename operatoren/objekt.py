@@ -1,6 +1,6 @@
 import bpy
 
-from operatoren.__methoden__ import generate_rig
+from .__methoden__ import generate_rig
 
 
 class ObjectOperator(bpy.types.Operator):

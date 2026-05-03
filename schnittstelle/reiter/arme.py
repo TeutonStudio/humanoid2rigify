@@ -1,6 +1,6 @@
 import bpy
 
-from schnittstelle.reiter.__methoden__ import draw_bone_prop_with_status
+from .__methoden__ import draw_bone_prop_with_status
 
 
 class ARMS_panel(bpy.types.Panel):

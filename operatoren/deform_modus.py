@@ -1,8 +1,8 @@
 import bpy
 
-from operatoren import any_rig_to_rigify_v2
-from operatoren.armature_cleanup import compute_deform_mode_keep_bones
-from operatoren.backup import create_backups
+from . import any_rig_to_rigify_v2
+from .armature_cleanup import compute_deform_mode_keep_bones
+from .backup import create_backups
 
 
 def make_armature_active(armature_obj):
@@ -72,4 +72,3 @@ def run_deform_mode(context):
         ),
     )
     return True
-

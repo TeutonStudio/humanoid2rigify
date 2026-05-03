@@ -2,7 +2,17 @@ import bpy
 
 from bpy.props import StringProperty,BoolProperty,EnumProperty
 
-from schnittstelle.__methoden__ import my_settings_callback
+from .__methoden__ import my_settings_callback
+
+
+def unregister():
+    for (prop_name, _) in PROPS:
+        delattr(bpy.types.Scene, prop_name)
+
+
+def register():
+    for (prop_name, prop_value) in PROPS:
+        setattr(bpy.types.Scene, prop_name, prop_value)
 
 PROPS = [
     ("copy_loc_constr", BoolProperty(name="Stretch", default=True)),
@@ -355,4 +365,3 @@ PROPS = [
     # ("heel_r", StringProperty(name="heel_r", default="")),
     # ("heel_l", StringProperty(name="heel_l", default="")),
 ]
-

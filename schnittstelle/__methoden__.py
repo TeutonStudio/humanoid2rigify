@@ -1,6 +1,7 @@
 import bpy
+import os
 
-from __methoden__ import get_mapping_folder
+from ..__methoden__ import get_mapping_folder
 
 
 def my_settings_callback(scene, context):

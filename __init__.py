@@ -1,5 +1,6 @@
 import bpy
 
+
 bl_info = {
     "name": "Any Rig to Rigify",
     "author": "demania",
@@ -11,9 +12,7 @@ bl_info = {
     "category": "Object",
 }
 
-from . import schnittstelle, operatoren
-
-
+from . import operatoren, schnittstelle
 _MODULES = [
     schnittstelle,
     operatoren,
