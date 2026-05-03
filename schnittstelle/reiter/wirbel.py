@@ -1,0 +1,23 @@
+import bpy
+
+from schnittstelle.reiter.__methoden__ import draw_bone_prop_with_status
+
+
+class SPINES_panel(bpy.types.Panel):
+    bl_idname = "SPINES_PT_panel"
+    bl_label = "Spines"
+    bl_category = "Any Rig to Rigify"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    # bl_options = {"DEFAULT_CLOSED"}
+
+    def draw(self, context):
+        layout = self.layout
+        scn = context.scene
+        # Spines
+        row = layout.row()
+        row.label(text='Spines')
+
+        box = layout.box()
+        for prop_name in ["first_spine", "last_spine"]:
+            draw_bone_prop_with_status(box, context, scn, prop_name)
