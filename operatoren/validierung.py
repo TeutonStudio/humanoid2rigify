@@ -1,26 +1,23 @@
+import bpy
+
+
 def is_generated_rigify_rig(armature_obj):
     if armature_obj is None or armature_obj.type != "ARMATURE":
         return False
 
-    if "rig_id" in armature_obj.keys():
-        return True
+    armature_data = getattr(armature_obj, "data", None)
+    if armature_data is None:
+        return False
 
-    armature_data = armature_obj.data
-    if armature_data is not None and "rig_id" in armature_data.keys():
-        return True
+    rig_id = armature_data.get("rig_id")
+    if not isinstance(rig_id, str) or not rig_id:
+        return False
 
-    bone_names = [bone.name for bone in armature_obj.data.bones]
-    def_bones = [name for name in bone_names if name.startswith("DEF-")]
-    org_bones = [name for name in bone_names if name.startswith("ORG-")]
-    mch_bones = [name for name in bone_names if name.startswith("MCH-")]
+    has_rig_ui_script = armature_obj.get("rig_ui") is not None
+    has_rig_ui_panel = hasattr(bpy.types, f"VIEW3D_PT_rig_ui_{rig_id}")
+    has_rig_layers_panel = hasattr(bpy.types, f"VIEW3D_PT_rig_layers_{rig_id}")
 
-    if len(def_bones) >= 5 and (len(org_bones) >= 1 or len(mch_bones) >= 1):
-        return True
-
-    if len(def_bones) >= 10 and "root" in bone_names:
-        return True
-
-    return False
+    return has_rig_ui_script or has_rig_ui_panel or has_rig_layers_panel
 
 
 def get_generation_blocker_message(armature_obj):
