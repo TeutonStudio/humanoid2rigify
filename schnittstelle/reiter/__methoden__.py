@@ -1,5 +1,11 @@
 import bpy
 
+from ..eigenschaften import (
+    is_bone_name_cache_valid,
+    schedule_bone_name_cache_refresh,
+)
+
+
 def get_selected_armature(context):
     active_object = context.active_object
     if active_object is not None and active_object.type == "ARMATURE":
@@ -45,17 +51,25 @@ def draw_bone_status(layout, context, bone_name):
 
 def draw_bone_prop_with_status(layout, context, scene, prop_name):
     armature = get_selected_armature(context)
-    prop_label = scene.bl_rna.properties[prop_name].name
+    prop_meta = scene.bl_rna.properties[prop_name]
+    prop_label = prop_meta.name
 
     if armature is not None:
+        schedule_bone_name_cache_refresh(scene, context)
+
+    if armature is not None and is_bone_name_cache_valid(scene, armature):
         layout.prop_search(
             scene,
             prop_name,
-            armature.data,
-            "bones",
+            scene,
+            "cached_bone_names",
             text=prop_label,
         )
     else:
         row = layout.row()
         row.enabled = False
+        row.prop(scene, prop_name, text=prop_label)
+
+    if armature is not None and not is_bone_name_cache_valid(scene, armature):
+        row = layout.row()
         row.prop(scene, prop_name, text=prop_label)

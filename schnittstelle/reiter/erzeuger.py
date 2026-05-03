@@ -4,8 +4,8 @@ from ..eigenschaften import (
     DEFAULT_MERGE_EXTRA_BONE_WHITELIST,
     get_next_merge_whitelist_value,
     ensure_merge_whitelist,
-    ensure_pose_mode_data,
     is_pose_armature_context,
+    schedule_merge_whitelist_initialization,
 )
 
 
@@ -69,7 +69,6 @@ class GENERATE_panel(bpy.types.Panel):
             box.label(text="Pose Mode mit aktiver Armature benötigt", icon="INFO")
             return
 
-        ensure_pose_mode_data(scn, context)
         box.prop(scn, "generation_mode")
         box.operator("opr.object_operator", text="Generate Rigify")
         box.prop(scn, "copy_loc_constr")
@@ -92,7 +91,7 @@ class MERGE_WHITELIST_panel(bpy.types.Panel):
             box.label(text="Pose Mode mit aktiver Armature benötigt", icon="INFO")
             return
 
-        ensure_pose_mode_data(scn, context)
+        schedule_merge_whitelist_initialization(scn)
         box.label(text="Standardmuster und Bones des aktuellen Rigs")
 
         if len(scn.merge_extra_bone_whitelist) == 0:

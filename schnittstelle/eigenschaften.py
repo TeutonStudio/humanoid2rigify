@@ -3,6 +3,7 @@ import bpy
 from bpy.props import (
     StringProperty,
     BoolProperty,
+    IntProperty,
     EnumProperty,
     CollectionProperty,
 )
@@ -20,10 +21,20 @@ DEFAULT_MERGE_EXTRA_BONE_WHITELIST = [
     "anus_open",
 ]
 
+_MERGE_WHITELIST_INIT_SCENE = None
+_BONE_NAME_CACHE_INIT_SCENE = None
+_BONE_NAME_CACHE_INIT_ARMATURE = None
+_BONE_NAME_CACHE = {}
+_WHITELIST_OPTION_CACHE = {}
+
 
 def get_current_armature(context):
     if context is None:
         return None
+
+    context_object = getattr(context, "object", None)
+    if context_object is not None and context_object.type == "ARMATURE":
+        return context_object
 
     active_object = getattr(context, "active_object", None)
     if active_object is not None and active_object.type == "ARMATURE":
@@ -38,27 +49,69 @@ def get_current_armature(context):
 
 def is_pose_armature_context(context):
     armature = get_current_armature(context)
-    return armature is not None and getattr(armature, "mode", None) == "POSE"
+    return (
+        armature is not None
+        and (
+            getattr(context, "mode", None) == "POSE"
+            or getattr(armature, "mode", None) == "POSE"
+        )
+    )
+
+
+def get_armature_cache_key(armature_obj):
+    if armature_obj is None:
+        return None
+
+    bone_names = tuple(bone.name for bone in armature_obj.data.bones)
+    return (armature_obj.as_pointer(), bone_names)
+
+
+def get_cached_bone_names(armature_obj):
+    if armature_obj is None:
+        return ()
+
+    cache_key = get_armature_cache_key(armature_obj)
+    cached = _BONE_NAME_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    _BONE_NAME_CACHE.clear()
+    bone_names = cache_key[1]
+    _BONE_NAME_CACHE[cache_key] = bone_names
+    return bone_names
 
 
 def get_merge_whitelist_option_values(context):
     option_values = list(DEFAULT_MERGE_EXTRA_BONE_WHITELIST)
+    scene = getattr(context, "scene", None) if context is not None else None
     armature_obj = get_current_armature(context)
     if armature_obj is None:
         return option_values
 
-    for bone in armature_obj.data.bones:
-        if bone.name not in option_values:
-            option_values.append(bone.name)
+    if scene is not None and is_bone_name_cache_valid(scene, armature_obj):
+        bone_names = (item.name for item in scene.cached_bone_names)
+    else:
+        bone_names = get_cached_bone_names(armature_obj)
+
+    for bone_name in bone_names:
+        if bone_name not in option_values:
+            option_values.append(bone_name)
 
     return option_values
 
 
 def get_merge_whitelist_items(self, context):
-    option_values = get_merge_whitelist_option_values(context)
+    armature_obj = get_current_armature(context)
+    cache_key = get_armature_cache_key(armature_obj)
+    option_values = _WHITELIST_OPTION_CACHE.get(cache_key)
+    if option_values is None:
+        option_values = tuple(get_merge_whitelist_option_values(context))
+        _WHITELIST_OPTION_CACHE.clear()
+        _WHITELIST_OPTION_CACHE[cache_key] = option_values
+
     current_value = getattr(self, "value", "")
     if current_value and current_value not in option_values:
-        option_values.insert(0, current_value)
+        option_values = (current_value, *option_values)
 
     return [
         (value, value, value)
@@ -83,6 +136,10 @@ class MergeWhitelistItem(bpy.types.PropertyGroup):
     value: EnumProperty(name="Bone", items=get_merge_whitelist_items)
 
 
+class CachedBoneNameItem(bpy.types.PropertyGroup):
+    name: StringProperty(name="Bone")
+
+
 def ensure_merge_whitelist(scene):
     collection = getattr(scene, "merge_extra_bone_whitelist", None)
     if collection is None or len(collection) != 0:
@@ -100,7 +157,121 @@ def ensure_pose_mode_data(scene, context):
     ensure_merge_whitelist(scene)
 
 
+def tag_redraw_all_areas():
+    window_manager = getattr(bpy.context, "window_manager", None)
+    if window_manager is None:
+        return
+
+    for window in window_manager.windows:
+        screen = getattr(window, "screen", None)
+        if screen is None:
+            continue
+        for area in screen.areas:
+            area.tag_redraw()
+
+
+def initialize_pending_merge_whitelist():
+    global _MERGE_WHITELIST_INIT_SCENE
+
+    scene_name = _MERGE_WHITELIST_INIT_SCENE
+    _MERGE_WHITELIST_INIT_SCENE = None
+    if scene_name is None:
+        return None
+
+    scene = bpy.data.scenes.get(scene_name)
+    if scene is None:
+        return None
+
+    ensure_merge_whitelist(scene)
+    tag_redraw_all_areas()
+    return None
+
+
+def is_bone_name_cache_valid(scene, armature_obj):
+    if scene is None or armature_obj is None:
+        return False
+
+    return (
+        scene.cached_bone_names_armature == armature_obj.name
+        and scene.cached_bone_names_count == len(armature_obj.data.bones)
+        and len(scene.cached_bone_names) != 0
+    )
+
+
+def rebuild_bone_name_cache(scene, armature_obj):
+    scene.cached_bone_names.clear()
+    for bone_name in get_cached_bone_names(armature_obj):
+        item = scene.cached_bone_names.add()
+        item.name = bone_name
+
+    scene.cached_bone_names_armature = armature_obj.name
+    scene.cached_bone_names_count = len(armature_obj.data.bones)
+    _WHITELIST_OPTION_CACHE.clear()
+
+
+def initialize_pending_bone_name_cache():
+    global _BONE_NAME_CACHE_INIT_SCENE
+    global _BONE_NAME_CACHE_INIT_ARMATURE
+
+    scene_name = _BONE_NAME_CACHE_INIT_SCENE
+    armature_name = _BONE_NAME_CACHE_INIT_ARMATURE
+    _BONE_NAME_CACHE_INIT_SCENE = None
+    _BONE_NAME_CACHE_INIT_ARMATURE = None
+    if scene_name is None or armature_name is None:
+        return None
+
+    scene = bpy.data.scenes.get(scene_name)
+    armature_obj = bpy.data.objects.get(armature_name)
+    if scene is None or armature_obj is None or armature_obj.type != "ARMATURE":
+        return None
+
+    rebuild_bone_name_cache(scene, armature_obj)
+    tag_redraw_all_areas()
+    return None
+
+
+def schedule_bone_name_cache_refresh(scene, context):
+    global _BONE_NAME_CACHE_INIT_SCENE
+    global _BONE_NAME_CACHE_INIT_ARMATURE
+
+    armature_obj = get_current_armature(context)
+    if scene is None or armature_obj is None:
+        return
+
+    if is_bone_name_cache_valid(scene, armature_obj):
+        return
+
+    _BONE_NAME_CACHE_INIT_SCENE = scene.name
+    _BONE_NAME_CACHE_INIT_ARMATURE = armature_obj.name
+    if not bpy.app.timers.is_registered(initialize_pending_bone_name_cache):
+        bpy.app.timers.register(initialize_pending_bone_name_cache, first_interval=0.0)
+
+
+def schedule_merge_whitelist_initialization(scene):
+    global _MERGE_WHITELIST_INIT_SCENE
+
+    if scene is None or len(scene.merge_extra_bone_whitelist) != 0:
+        return
+
+    _MERGE_WHITELIST_INIT_SCENE = scene.name
+    if not bpy.app.timers.is_registered(initialize_pending_merge_whitelist):
+        bpy.app.timers.register(initialize_pending_merge_whitelist, first_interval=0.0)
+
+
 def unregister():
+    global _MERGE_WHITELIST_INIT_SCENE
+    global _BONE_NAME_CACHE_INIT_SCENE
+    global _BONE_NAME_CACHE_INIT_ARMATURE
+
+    _MERGE_WHITELIST_INIT_SCENE = None
+    _BONE_NAME_CACHE_INIT_SCENE = None
+    _BONE_NAME_CACHE_INIT_ARMATURE = None
+    _BONE_NAME_CACHE.clear()
+    _WHITELIST_OPTION_CACHE.clear()
+    if bpy.app.timers.is_registered(initialize_pending_bone_name_cache):
+        bpy.app.timers.unregister(initialize_pending_bone_name_cache)
+    if bpy.app.timers.is_registered(initialize_pending_merge_whitelist):
+        bpy.app.timers.unregister(initialize_pending_merge_whitelist)
     for (prop_name, _) in PROPS:
         delattr(bpy.types.Scene, prop_name)
     for cls in reversed(CLASSES):
@@ -108,6 +279,8 @@ def unregister():
 
 
 def register():
+    _BONE_NAME_CACHE.clear()
+    _WHITELIST_OPTION_CACHE.clear()
     for cls in CLASSES:
         bpy.utils.register_class(cls)
     for (prop_name, prop_value) in PROPS:
@@ -116,6 +289,7 @@ def register():
 
 CLASSES = [
     MergeWhitelistItem,
+    CachedBoneNameItem,
 ]
 
 
@@ -123,6 +297,9 @@ PROPS = [
     ("copy_loc_constr", BoolProperty(name="Stretch", default=True)),
     ("fingers_bool_r", BoolProperty(name="right fingers", default=True)),
     ("fingers_bool_l", BoolProperty(name="left fingers", default=True)),
+    ("cached_bone_names", CollectionProperty(type=CachedBoneNameItem)),
+    ("cached_bone_names_armature", StringProperty(name="Cached Bone Armature", default="")),
+    ("cached_bone_names_count", IntProperty(name="Cached Bone Count", default=0)),
     ("merge_extra_bone_whitelist", CollectionProperty(type=MergeWhitelistItem)),
     (
         "generation_mode",
