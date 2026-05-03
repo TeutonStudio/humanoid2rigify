@@ -33,14 +33,24 @@ def dispatch_generation(operator, armature_obj, params):
     if context.generation_mode == MODE_DEFORM_RIG_CONSTRAINT_NEW_RIGIFY:
         operator.report(
             {"INFO"},
-            "Der Deformationsrig-Modus folgt im naechsten Umbauabschnitt.",
+            (
+                "Analyse vorbereitet: "
+                f"{len(context.used_deform_bones)} benutzte Deform-Bones, "
+                f"{len(context.extra_bones)} Zusatzknochen. "
+                "Der Deformationsrig-Modus folgt im naechsten Umbauabschnitt."
+            ),
         )
         return False
 
     if context.generation_mode == MODE_MERGE_WITH_NEW_RIGIFY:
         operator.report(
             {"INFO"},
-            "Der Verschmelzungs-Modus folgt im naechsten Umbauabschnitt.",
+            (
+                "Analyse vorbereitet: "
+                f"{len(context.used_deform_bones)} benutzte Deform-Bones, "
+                f"{len(context.extra_bones)} Zusatzknochen. "
+                "Der Verschmelzungs-Modus folgt im naechsten Umbauabschnitt."
+            ),
         )
         return False
 
