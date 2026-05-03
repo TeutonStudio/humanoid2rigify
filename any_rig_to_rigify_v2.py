@@ -224,6 +224,12 @@ def get_avarage(bone_List, head_tail="tail"):
     return x_avg, y_avg, z_avg
 
 
+def average_vectors(vectors):
+    if len(vectors) == 0:
+        return None
+    return sum(vectors, Vector()) / len(vectors)
+
+
 # ===========================================================
 
 
@@ -1054,16 +1060,12 @@ def the_script(skeleton_model, parameters):
     if (len(hand_L_children) < 4) or (len(hand_R_children) < 4):
         finger_child_vectors_L = [fc.head for fc in hand_L_children]
         finger_child_vectors_R = [fc.head for fc in hand_R_children]
-        if fingers_bool_l == True:
-            median_point_l = sum(finger_child_vectors_L, Vector()) / len(
-                finger_child_vectors_L
-            )
+        if fingers_bool_l == True and len(finger_child_vectors_L) != 0:
+            median_point_l = average_vectors(finger_child_vectors_L)
             hand_L.tail = median_point_l
 
-        if fingers_bool_r == True:
-            median_point_r = sum(finger_child_vectors_R, Vector()) / len(
-                finger_child_vectors_R
-            )
+        if fingers_bool_r == True and len(finger_child_vectors_R) != 0:
+            median_point_r = average_vectors(finger_child_vectors_R)
             hand_R.tail = median_point_r
 
         bone_head_tail_loc = {}
@@ -1142,11 +1144,11 @@ def the_script(skeleton_model, parameters):
                                 co_final = c.matrix_world @ i.co
                                 finger_vert_vector.append(co_final)
 
-                            finger_median_point = sum(finger_vert_vector, Vector()) / len(
-                                finger_vert_vector
-                            )
-                            finger_bone.tail = finger_median_point
-                            break
+                            finger_median_point = average_vectors(
+                                finger_vert_vector)
+                            if finger_median_point is not None:
+                                finger_bone.tail = finger_median_point
+                                break
                             # else:
                             # print("no verts")
                             #     print(finger_vert_vector)
