@@ -59,5 +59,3 @@ def draw_bone_prop_with_status(layout, context, scene, prop_name):
         row = layout.row()
         row.enabled = False
         row.prop(scene, prop_name, text=prop_label)
-
-    draw_bone_status(layout, context, getattr(scene, prop_name))
