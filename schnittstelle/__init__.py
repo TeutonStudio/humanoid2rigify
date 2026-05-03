@@ -1,10 +1,10 @@
 import bpy
 
-from . import reiter, eigenschaften
+from . import eigenschaften, reiter
 
 _MODULES = [
-    reiter,
     eigenschaften,
+    reiter,
 ]
 
 def register():

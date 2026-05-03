@@ -81,9 +81,9 @@ class ObjectOperator(bpy.types.Operator):
             "copy_loc_constr": context.scene.copy_loc_constr,
             "generation_mode": context.scene.generation_mode,
             "merge_extra_bone_whitelist": [
-                item.pattern
+                item.value
                 for item in context.scene.merge_extra_bone_whitelist
-                if item.pattern.strip()
+                if item.value
             ],
         }
 

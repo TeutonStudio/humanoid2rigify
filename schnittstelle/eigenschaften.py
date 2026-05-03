@@ -21,8 +21,61 @@ DEFAULT_MERGE_EXTRA_BONE_WHITELIST = [
 ]
 
 
+def get_current_armature(context):
+    if context is None:
+        return None
+
+    active_object = getattr(context, "active_object", None)
+    if active_object is not None and active_object.type == "ARMATURE":
+        return active_object
+
+    for obj in getattr(context, "selected_objects", []):
+        if obj.type == "ARMATURE":
+            return obj
+
+    return None
+
+
+def get_merge_whitelist_option_values(context):
+    option_values = list(DEFAULT_MERGE_EXTRA_BONE_WHITELIST)
+    armature_obj = get_current_armature(context)
+    if armature_obj is None:
+        return option_values
+
+    for bone in armature_obj.data.bones:
+        if bone.name not in option_values:
+            option_values.append(bone.name)
+
+    return option_values
+
+
+def get_merge_whitelist_items(self, context):
+    option_values = get_merge_whitelist_option_values(context)
+    current_value = getattr(self, "value", "")
+    if current_value and current_value not in option_values:
+        option_values.insert(0, current_value)
+
+    return [
+        (value, value, value)
+        for value in option_values
+    ]
+
+
+def get_next_merge_whitelist_value(scene, context):
+    existing_values = {
+        item.value
+        for item in scene.merge_extra_bone_whitelist
+        if item.value
+    }
+    for value in get_merge_whitelist_option_values(context):
+        if value not in existing_values:
+            return value
+
+    return DEFAULT_MERGE_EXTRA_BONE_WHITELIST[0]
+
+
 class MergeWhitelistItem(bpy.types.PropertyGroup):
-    pattern: StringProperty(name="Pattern", default="")
+    value: EnumProperty(name="Bone", items=get_merge_whitelist_items)
 
 
 def ensure_merge_whitelist(scene):
@@ -32,7 +85,7 @@ def ensure_merge_whitelist(scene):
 
     for pattern in DEFAULT_MERGE_EXTRA_BONE_WHITELIST:
         item = collection.add()
-        item.pattern = pattern
+        item.value = pattern
 
 
 def unregister():

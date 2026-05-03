@@ -106,7 +106,12 @@ def rebind_meshes_to_rigify(context, rigify_obj):
             if mesh_obj.parent_type == 'BONE':
                 mapping = context.source_to_target_map.get(mesh_obj.parent_bone)
                 if mapping is not None:
-                    mesh_obj.parent_bone = mapping.get("merge_target", mesh_obj.parent_bone)
+                    target_bone_name = mapping.get("merge_target", mesh_obj.parent_bone)
+                    if rigify_obj.data.bones.get(target_bone_name) is not None:
+                        mesh_obj.parent_bone = target_bone_name
+                    else:
+                        mesh_obj.parent_type = 'OBJECT'
+                        mesh_obj.parent_bone = ""
 
         updated = False
         for modifier in mesh_obj.modifiers:
@@ -156,6 +161,13 @@ def run_merge_mode(context):
         return False
 
     ensured_targets = ensure_required_merge_bones(context, rigify_obj)
+    skipped_merge_bones = [
+        source_bone_name
+        for source_bone_name, mapping in context.source_to_target_map.items()
+        if source_bone_name in context.weighted_vertex_groups
+        and not mapping.get("is_standard", True)
+        and not mapping.get("needs_new_merge_bone", True)
+    ]
     copied_shapes = inherit_missing_custom_shapes(
         context,
         rigify_obj,
@@ -176,7 +188,8 @@ def run_merge_mode(context):
             f"Verschmolzen, {len(ensured_targets)} Zielknochen gesichert, "
             f"{copied_shapes} Custom Shapes uebernommen oder ersetzt, "
             f"{migrated_groups} Vertex-Groups migriert, "
-            f"{rebound_meshes} Meshes umgehaengt."
+            f"{rebound_meshes} Meshes umgehaengt, "
+            f"{len(skipped_merge_bones)} Extra-Bones nicht uebertragen."
         ),
     )
     return True

@@ -1,6 +1,10 @@
 import bpy
 
-from ..eigenschaften import DEFAULT_MERGE_EXTRA_BONE_WHITELIST, ensure_merge_whitelist
+from ..eigenschaften import (
+    DEFAULT_MERGE_EXTRA_BONE_WHITELIST,
+    get_next_merge_whitelist_value,
+    ensure_merge_whitelist,
+)
 
 
 class OPR_add_merge_whitelist_item(bpy.types.Operator):
@@ -10,7 +14,7 @@ class OPR_add_merge_whitelist_item(bpy.types.Operator):
     def execute(self, context):
         ensure_merge_whitelist(context.scene)
         item = context.scene.merge_extra_bone_whitelist.add()
-        item.pattern = "new_pattern"
+        item.value = get_next_merge_whitelist_value(context.scene, context)
         return {"FINISHED"}
 
 
@@ -34,13 +38,14 @@ class OPR_reset_merge_whitelist(bpy.types.Operator):
     bl_label = "Whitelist zuruecksetzen"
 
     def execute(self, context):
+        ensure_merge_whitelist(context.scene)
         whitelist = context.scene.merge_extra_bone_whitelist
         while len(whitelist) != 0:
             whitelist.remove(len(whitelist) - 1)
 
         for pattern in DEFAULT_MERGE_EXTRA_BONE_WHITELIST:
             item = whitelist.add()
-            item.pattern = pattern
+            item.value = pattern
 
         return {"FINISHED"}
 
@@ -56,6 +61,7 @@ class GENERATE_panel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         scn = context.scene
+        ensure_merge_whitelist(scn)
 
         box = self.layout.box()
         box.label(text="Generate")
@@ -78,13 +84,16 @@ class MERGE_WHITELIST_panel(bpy.types.Panel):
 
         box = layout.box()
         box.label(text="Knochen-Uebernahme")
-        box.label(text="Wildcard * ist erlaubt")
+        box.label(text="Standardmuster und Bones des aktuellen Rigs")
+
+        if len(scn.merge_extra_bone_whitelist) == 0:
+            box.label(text="Keine Eintraege vorhanden")
 
         row = box.row()
         col = row.column()
         for index, item in enumerate(scn.merge_extra_bone_whitelist):
             item_row = col.row(align=True)
-            item_row.prop(item, "pattern", text=f"{index + 1}")
+            item_row.prop(item, "value", text=f"{index + 1}")
             remove_op = item_row.operator("opr.remove_merge_whitelist_item", text="", icon="X")
             remove_op.item_index = index
 
