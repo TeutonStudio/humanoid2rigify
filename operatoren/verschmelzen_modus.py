@@ -17,6 +17,9 @@ def ensure_required_merge_bones(context, rigify_obj):
         if source_bone_name not in context.weighted_vertex_groups:
             continue
 
+        if not mapping.get("needs_new_merge_bone", True):
+            continue
+
         target_bone_name = mapping.get("merge_target")
         if not target_bone_name:
             continue
@@ -76,6 +79,9 @@ def migrate_vertex_groups(context, rigify_obj):
     for mesh_obj in context.bound_meshes:
         for source_bone_name, mapping in context.source_to_target_map.items():
             if source_bone_name not in context.weighted_vertex_groups:
+                continue
+
+            if not mapping.get("needs_new_merge_bone", True):
                 continue
 
             target_bone_name = mapping.get("merge_target")

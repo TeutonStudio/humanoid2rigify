@@ -71,10 +71,28 @@ GENERATED_HELPER_BONES = {
 }
 
 DEF_EXCLUDED_TARGET_NAMES = {"torso", "neck", "chest"}
+MERGE_EXTRA_BONE_EXACT_NAMES = {
+    "rig",
+    "properties",
+    "clothes",
+    "gen_teste_r",
+    "gen_teste_l",
+    "anus_open",
+}
+MERGE_EXTRA_BONE_PREFIXES = (
+    "gen_donger_",
+)
 
 
 def unique_non_empty(values):
     return list(dict.fromkeys([value for value in values if value]))
+
+
+def is_merge_extra_bone_name(bone_name):
+    if bone_name in MERGE_EXTRA_BONE_EXACT_NAMES:
+        return True
+
+    return any(bone_name.startswith(prefix) for prefix in MERGE_EXTRA_BONE_PREFIXES)
 
 
 def get_standard_source_bone_names(params):
@@ -299,6 +317,7 @@ def build_extra_bone_data(armature_obj, extra_bones, weighted_vertex_groups):
             continue
 
         has_weights = bone_name in weighted_vertex_groups
+        needs_new_merge_bone = is_merge_extra_bone_name(bone_name)
         extra_bone_data[bone_name] = {
             "source_bone": bone_name,
             "constraint_target": bone_name,
@@ -306,8 +325,9 @@ def build_extra_bone_data(armature_obj, extra_bones, weighted_vertex_groups):
             "is_standard": False,
             "use_deform": bone.use_deform,
             "has_weights": has_weights,
+            "is_hidden": bone.hide,
             "keep_in_deform_mode": bone.use_deform and has_weights,
-            "needs_new_merge_bone": True,
+            "needs_new_merge_bone": needs_new_merge_bone,
         }
 
     return extra_bone_data

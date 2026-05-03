@@ -31,6 +31,10 @@ LEGACY_LAYER_TO_COLLECTION = {
     31: "Root",
 }
 
+COLLECTION_UI_ROWS = {
+    "Additional": 11,
+}
+
 
 # ===========================================================
 # ===========================================================
@@ -83,6 +87,8 @@ def get_or_create_bone_collection(armature_data, layer_index):
     bone_collection = armature_data.collections_all.get(collection_name)
     if bone_collection is None:
         bone_collection = armature_data.collections.new(collection_name)
+        if hasattr(bone_collection, "rigify_ui_row"):
+            bone_collection.rigify_ui_row = COLLECTION_UI_ROWS.get(collection_name, 0)
     bone_collection.is_visible = True
     return bone_collection
 

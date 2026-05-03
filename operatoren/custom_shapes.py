@@ -58,6 +58,9 @@ def should_replace_custom_shape(source_pose_bone, target_pose_bone, mapping):
     if source_pose_bone.custom_shape is None:
         return False
 
+    if not mapping.get("is_standard", True) and source_pose_bone.bone.hide:
+        return False
+
     if target_pose_bone.custom_shape is None:
         return True
 
