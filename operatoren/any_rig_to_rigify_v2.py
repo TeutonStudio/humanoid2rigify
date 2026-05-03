@@ -136,6 +136,30 @@ def set_rigify_layer_param(rigify_param, attr_name, layer_index):
         layer_config[layer_index] = True
 
 
+def get_current_target_collection():
+    active_layer_collection = getattr(bpy.context.view_layer, "active_layer_collection", None)
+    if active_layer_collection is not None and active_layer_collection.collection is not None:
+        return active_layer_collection.collection
+
+    context_collection = getattr(bpy.context, "collection", None)
+    if context_collection is not None:
+        return context_collection
+
+    return bpy.context.scene.collection
+
+
+def move_object_to_collection(obj, target_collection):
+    if obj is None or target_collection is None:
+        return
+
+    if obj.name not in target_collection.objects:
+        target_collection.objects.link(obj)
+
+    for collection in list(obj.users_collection):
+        if collection != target_collection:
+            collection.objects.unlink(obj)
+
+
 # ===========================================================
 
 
@@ -485,6 +509,7 @@ def clean_bones_between():
 
 def the_script(skeleton_model, parameters):
     ensure_rigify_enabled()
+    target_collection = get_current_target_collection()
 
     # set 3d cursor to (0,0,0)
     bpy.context.scene.cursor.location = (0, 0, 0)
@@ -776,6 +801,7 @@ def the_script(skeleton_model, parameters):
     METARIG_NAME = f"{EXTERNAL_RIG_NAME}_metarig"
     so.name = METARIG_NAME
     METARIG_OBJ = bpy.data.objects[METARIG_NAME]
+    move_object_to_collection(METARIG_OBJ, target_collection)
 
     # ===============================================================
     # delete bones
@@ -1469,6 +1495,7 @@ def the_script(skeleton_model, parameters):
     rig.name = EXTERNAL_RIG_NAME + RIGIFY_NAME
     RIGIFY_NAME = rig.name
     RIGIFY_OBJ = bpy.data.objects[RIGIFY_NAME]
+    move_object_to_collection(RIGIFY_OBJ, target_collection)
 
     # [!!!] DON'T delete layer 31
     layers = [0, 3, 6, 8, 11, 14, 17, 31]
