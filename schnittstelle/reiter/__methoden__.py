@@ -44,5 +44,20 @@ def draw_bone_status(layout, context, bone_name):
 
 
 def draw_bone_prop_with_status(layout, context, scene, prop_name):
-    layout.prop(scene, prop_name)
+    armature = get_selected_armature(context)
+    prop_label = scene.bl_rna.properties[prop_name].name
+
+    if armature is not None:
+        layout.prop_search(
+            scene,
+            prop_name,
+            armature.data,
+            "bones",
+            text=prop_label,
+        )
+    else:
+        row = layout.row()
+        row.enabled = False
+        row.prop(scene, prop_name, text=prop_label)
+
     draw_bone_status(layout, context, getattr(scene, prop_name))

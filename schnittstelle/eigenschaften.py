@@ -1,5 +1,6 @@
 import bpy
 
+from bpy.app.handlers import persistent
 from bpy.props import (
     StringProperty,
     BoolProperty,
@@ -20,6 +21,8 @@ DEFAULT_MERGE_EXTRA_BONE_WHITELIST = [
     "anus_open",
 ]
 
+_LAST_POSE_MODE_STATE = None
+
 
 def get_current_armature(context):
     if context is None:
@@ -34,6 +37,11 @@ def get_current_armature(context):
             return obj
 
     return None
+
+
+def is_pose_armature_context(context):
+    armature = get_current_armature(context)
+    return armature is not None and getattr(armature, "mode", None) == "POSE"
 
 
 def get_merge_whitelist_option_values(context):
@@ -88,7 +96,52 @@ def ensure_merge_whitelist(scene):
         item.value = pattern
 
 
+def ensure_pose_mode_data(scene, context):
+    if scene is None or context is None or not is_pose_armature_context(context):
+        return
+
+    ensure_merge_whitelist(scene)
+
+
+def tag_redraw_all_areas():
+    window_manager = getattr(bpy.context, "window_manager", None)
+    if window_manager is None:
+        return
+
+    for window in window_manager.windows:
+        screen = getattr(window, "screen", None)
+        if screen is None:
+            continue
+        for area in screen.areas:
+            area.tag_redraw()
+
+
+@persistent
+def ensure_pose_mode_data_on_update(_scene, _depsgraph):
+    global _LAST_POSE_MODE_STATE
+
+    context = bpy.context
+    scene = getattr(context, "scene", None)
+    armature = get_current_armature(context)
+    state = (
+        scene.as_pointer() if scene is not None else None,
+        armature.as_pointer() if armature is not None else None,
+        getattr(armature, "mode", None) if armature is not None else None,
+    )
+    if state == _LAST_POSE_MODE_STATE:
+        return
+
+    _LAST_POSE_MODE_STATE = state
+    ensure_pose_mode_data(scene, context)
+    tag_redraw_all_areas()
+
+
 def unregister():
+    global _LAST_POSE_MODE_STATE
+
+    _LAST_POSE_MODE_STATE = None
+    if ensure_pose_mode_data_on_update in bpy.app.handlers.depsgraph_update_post:
+        bpy.app.handlers.depsgraph_update_post.remove(ensure_pose_mode_data_on_update)
     for (prop_name, _) in PROPS:
         delattr(bpy.types.Scene, prop_name)
     for cls in reversed(CLASSES):
@@ -96,10 +149,15 @@ def unregister():
 
 
 def register():
+    global _LAST_POSE_MODE_STATE
+
+    _LAST_POSE_MODE_STATE = None
     for cls in CLASSES:
         bpy.utils.register_class(cls)
     for (prop_name, prop_value) in PROPS:
         setattr(bpy.types.Scene, prop_name, prop_value)
+    if ensure_pose_mode_data_on_update not in bpy.app.handlers.depsgraph_update_post:
+        bpy.app.handlers.depsgraph_update_post.append(ensure_pose_mode_data_on_update)
 
 
 CLASSES = [

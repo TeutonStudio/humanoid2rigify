@@ -4,12 +4,14 @@ from ..eigenschaften import (
     DEFAULT_MERGE_EXTRA_BONE_WHITELIST,
     get_next_merge_whitelist_value,
     ensure_merge_whitelist,
+    ensure_pose_mode_data,
+    is_pose_armature_context,
 )
 
 
 class OPR_add_merge_whitelist_item(bpy.types.Operator):
     bl_idname = "opr.add_merge_whitelist_item"
-    bl_label = "Whitelist-Eintrag hinzufuegen"
+    bl_label = "Whitelist-Eintrag hinzufügen"
 
     def execute(self, context):
         ensure_merge_whitelist(context.scene)
@@ -35,7 +37,7 @@ class OPR_remove_merge_whitelist_item(bpy.types.Operator):
 
 class OPR_reset_merge_whitelist(bpy.types.Operator):
     bl_idname = "opr.reset_merge_whitelist"
-    bl_label = "Whitelist zuruecksetzen"
+    bl_label = "Whitelist zurücksetzen"
 
     def execute(self, context):
         ensure_merge_whitelist(context.scene)
@@ -61,10 +63,13 @@ class GENERATE_panel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         scn = context.scene
-        ensure_merge_whitelist(scn)
-
         box = self.layout.box()
         box.label(text="Generate")
+        if not is_pose_armature_context(context):
+            box.label(text="Pose Mode mit aktiver Armature benötigt", icon="INFO")
+            return
+
+        ensure_pose_mode_data(scn, context)
         box.prop(scn, "generation_mode")
         box.operator("opr.object_operator", text="Generate Rigify")
         box.prop(scn, "copy_loc_constr")
@@ -80,14 +85,18 @@ class MERGE_WHITELIST_panel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         scn = context.scene
-        ensure_merge_whitelist(scn)
 
         box = layout.box()
-        box.label(text="Knochen-Uebernahme")
+        box.label(text="Knochen-Übernahme")
+        if not is_pose_armature_context(context):
+            box.label(text="Pose Mode mit aktiver Armature benötigt", icon="INFO")
+            return
+
+        ensure_pose_mode_data(scn, context)
         box.label(text="Standardmuster und Bones des aktuellen Rigs")
 
         if len(scn.merge_extra_bone_whitelist) == 0:
-            box.label(text="Keine Eintraege vorhanden")
+            box.label(text="Keine Einträge vorhanden")
 
         row = box.row()
         col = row.column()
