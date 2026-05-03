@@ -38,13 +38,11 @@ def ensure_required_merge_bones(context, rigify_obj):
 
     return ensured_targets
 
-
 def find_group_weight(vertex, group_index):
     for assignment in vertex.groups:
         if assignment.group == group_index:
             return assignment.weight
     return None
-
 
 def move_vertex_group_weights(mesh_obj, source_group_name, target_group_name):
     if source_group_name == target_group_name:
@@ -73,7 +71,6 @@ def move_vertex_group_weights(mesh_obj, source_group_name, target_group_name):
     mesh_obj.vertex_groups.remove(source_group)
     return True
 
-
 def migrate_vertex_groups(context, rigify_obj):
     migrated_groups = 0
     for mesh_obj in context.bound_meshes:
@@ -95,7 +92,6 @@ def migrate_vertex_groups(context, rigify_obj):
                 migrated_groups += 1
 
     return migrated_groups
-
 
 def rebind_meshes_to_rigify(context, rigify_obj):
     rebound_meshes = 0
@@ -124,7 +120,6 @@ def rebind_meshes_to_rigify(context, rigify_obj):
 
     return rebound_meshes
 
-
 def delete_source_armature(source_armature, fallback_active_obj=None):
     if fallback_active_obj is not None:
         make_object_active(fallback_active_obj)
@@ -132,7 +127,6 @@ def delete_source_armature(source_armature, fallback_active_obj=None):
         make_object_active(source_armature)
 
     bpy.data.objects.remove(source_armature, do_unlink=True)
-
 
 def run_merge_mode(context):
     if not context.bound_meshes:

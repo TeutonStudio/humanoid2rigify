@@ -1,10 +1,7 @@
 import bpy
 
-from ..eigenschaften import (
-    is_bone_name_cache_valid,
-    schedule_bone_name_cache_refresh,
-)
-
+from __eigenschaften__ import SEITE
+from ...__methoden__ import schedule_bone_name_cache_refresh, is_bone_name_cache_valid
 
 def get_selected_armature(context):
     active_object = context.active_object
@@ -17,7 +14,6 @@ def get_selected_armature(context):
 
     return None
 
-
 def get_bone_status(context, bone_name):
     armature = get_selected_armature(context)
     if armature is None:
@@ -27,7 +23,6 @@ def get_bone_status(context, bone_name):
         return "found"
 
     return "missing_bone"
-
 
 def draw_bone_status(layout, context, bone_name):
     status = get_bone_status(context, bone_name)
@@ -48,7 +43,6 @@ def draw_bone_status(layout, context, bone_name):
         icon="ERROR",
     )
 
-
 def draw_bone_prop_with_status(layout, context, scene, prop_name):
     armature = get_selected_armature(context)
     prop_meta = scene.bl_rna.properties[prop_name]
@@ -63,3 +57,18 @@ def draw_bone_prop_with_status(layout, context, scene, prop_name):
     pick_button.enabled = armature is not None and is_bone_name_cache_valid(scene, armature)
     pick_op = pick_button.operator("opr.pick_scene_bone_prop", text="", icon="BONE_DATA")
     pick_op.prop_name = prop_name
+
+def draw_bone_prop_with_status_per_side(layout, context, liste, prop_button=False):
+    scene = context.scene
+    box = layout.box()
+    for seite in SEITE:
+        prop = "fingers_bool_"+seite
+        if prop_button:
+            box.prop(scene,prop)
+            if getattr(scene,prop) == True: _draw_bone_iteration(layout,context,scene,liste,seite)
+        else: _draw_bone_iteration(layout,context,scene,liste,seite)
+
+def _draw_bone_iteration(layout,context,scene,liste,seite):
+    for prop_part in liste:
+        prop_name = prop_part + seite
+        draw_bone_prop_with_status(layout,context,scene,prop_name)

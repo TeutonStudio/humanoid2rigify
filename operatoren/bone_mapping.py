@@ -1,16 +1,6 @@
 from fnmatch import fnmatchcase
 
-
-DEFAULT_MERGE_EXTRA_BONE_WHITELIST = [
-    "rig",
-    "properties",
-    "clothes",
-    "gen_donger_*",
-    "gen_teste_r",
-    "gen_teste_l",
-    "anus_open",
-]
-
+from ..__methoden__ import DEFAULT_MERGE_EXTRA_BONE_WHITELIST
 
 PARAM_BONE_KEYS = [
     "head",

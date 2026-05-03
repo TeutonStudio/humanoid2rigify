@@ -1,12 +1,11 @@
 import bpy
 
+from ..__panel__ import Panel
 
-class MAPPING_panel(bpy.types.Panel):
+
+class MAPPING_panel(Panel):
     bl_idname = "MAPPING_PT_panel"
     bl_label = "Mapping"
-    bl_category = "Any Rig to Rigify"
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
     # bl_options = {"DEFAULT_CLOSED"}
 
     def draw(self, context):

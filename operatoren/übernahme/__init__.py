@@ -1,0 +1,18 @@
+import bpy
+
+from . import auswählen, erweitern, vernichten, standardisieren
+from ..__operator__ import Operator
+from typing import Type
+
+_OPERATOREN: list[Type[Operator]] = [
+    auswählen.OPR_pick_merge_whitelist_bone,
+    erweitern.OPR_add_merge_whitelist_item,
+    vernichten.OPR_remove_merge_whitelist_item,
+    standardisieren.OPR_reset_merge_whitelist,
+]
+
+def register():
+    for op in _OPERATOREN: bpy.utils.register_class(op)
+
+def unregister():
+    for op in reversed(_OPERATOREN): bpy.utils.unregister_class(op)

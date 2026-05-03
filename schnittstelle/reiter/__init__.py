@@ -1,15 +1,13 @@
+from typing import Type
+
 import bpy
 
-from . import arme, beine, erzeuger, finger, torso, wirbel, zuordnung
+from . import arme, beine, erzeuger, finger, torso, wirbel, zuordnung, whitelist
+from ..__panel__ import Panel
 
-_CLASSES = [
-    erzeuger.OPR_pick_scene_bone_prop,
-    erzeuger.OPR_add_merge_whitelist_item,
-    erzeuger.OPR_remove_merge_whitelist_item,
-    erzeuger.OPR_pick_merge_whitelist_bone,
-    erzeuger.OPR_reset_merge_whitelist,
+_PANELE: list[Type[Panel]] = [
     erzeuger.GENERATE_panel,
-    erzeuger.MERGE_WHITELIST_panel,
+    whitelist.MERGE_WHITELIST_panel,
     zuordnung.MAPPING_panel,
     torso.UPPER_BODY_panel,
     wirbel.SPINES_panel,
@@ -19,8 +17,8 @@ _CLASSES = [
 ]
 
 def register():
-    for c in _CLASSES: bpy.utils.register_class(c)
+    for p in _PANELE: bpy.utils.register_class(p)
 
 
 def unregister():
-    for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
+    for p in reversed(_PANELE): bpy.utils.unregister_class(p)

@@ -1,14 +1,13 @@
 import bpy
 
+from __eigenschaften__ import WIRBEL
 from .__methoden__ import draw_bone_prop_with_status
+from ..__panel__ import Panel
 
 
-class SPINES_panel(bpy.types.Panel):
+class SPINES_panel(Panel):
     bl_idname = "SPINES_PT_panel"
     bl_label = "Spines"
-    bl_category = "Any Rig to Rigify"
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
     # bl_options = {"DEFAULT_CLOSED"}
 
     def draw(self, context):
@@ -19,5 +18,5 @@ class SPINES_panel(bpy.types.Panel):
         row.label(text='Spines')
 
         box = layout.box()
-        for prop_name in ["first_spine", "last_spine"]:
+        for prop_name in WIRBEL:
             draw_bone_prop_with_status(box, context, scn, prop_name)

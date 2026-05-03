@@ -1,14 +1,12 @@
 import bpy
 
+from __eigenschaften__ import TORSO
 from .__methoden__ import draw_bone_prop_with_status
+from ..__panel__ import Panel
 
-
-class UPPER_BODY_panel(bpy.types.Panel):
+class UPPER_BODY_panel(Panel):
     bl_idname = "UPPER_BODY_PT_panel"
     bl_label = "Upper body"
-    bl_category = "Any Rig to Rigify"
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
     # bl_options = {"DEFAULT_CLOSED"}
 
     def draw(self, context):
@@ -16,5 +14,5 @@ class UPPER_BODY_panel(bpy.types.Panel):
         scn = context.scene
 
         box = layout.box()
-        for prop_name in ["head", "first_neck", "last_neck", "clav_r", "clav_l"]:
+        for prop_name in TORSO:
             draw_bone_prop_with_status(box, context, scn, prop_name)

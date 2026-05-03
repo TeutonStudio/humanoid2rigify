@@ -1,31 +1,29 @@
 import bpy
+import json
 
-from .__methoden__ import generate_rig
-from ..schnittstelle.eigenschaften import ensure_merge_whitelist
+from operatoren.__operator__ import Operator
+from __methoden__ import get_mapping_folder
 
-
-class ObjectOperator(bpy.types.Operator):
-    bl_idname = "opr.object_operator"
-    bl_label = "Any Rig to Rigify"
-    bl_options = {"UNDO"}
+class MappingSaveOperator(Operator):
+    bl_idname = "opr.mapping_save_operator"
+    bl_label = "mapping_templates"
+    bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        ensure_merge_whitelist(context.scene)
-        params = {
+        prop_dict = {
             "head": context.scene.head,
             "first_neck": context.scene.first_neck,
             "last_neck": context.scene.last_neck,
             "first_spine": context.scene.first_spine,
             "last_spine": context.scene.last_spine,
-            "clav_r": context.scene.clav_r,
             "clav_l": context.scene.clav_l,
-            "uparm_l": context.scene.uparm_l,
+            "clav_r": context.scene.clav_r,
             "uparm_r": context.scene.uparm_r,
-            "lowarm_l": context.scene.lowarm_l,
+            "uparm_l": context.scene.uparm_l,
             "lowarm_r": context.scene.lowarm_r,
-            "hand_l": context.scene.hand_l,
+            "lowarm_l": context.scene.lowarm_l,
             "hand_r": context.scene.hand_r,
-
+            "hand_l": context.scene.hand_l,
             "palm_pinky_r": context.scene.palm_pinky_r,
             "pinky_01_r": context.scene.pinky_01_r,
             "pinky_02_r": context.scene.pinky_02_r,
@@ -45,7 +43,6 @@ class ObjectOperator(bpy.types.Operator):
             "thumb_01_r": context.scene.thumb_01_r,
             "thumb_02_r": context.scene.thumb_02_r,
             "thumb_03_r": context.scene.thumb_03_r,
-
             "palm_pinky_l": context.scene.palm_pinky_l,
             "pinky_01_l": context.scene.pinky_01_l,
             "pinky_02_l": context.scene.pinky_02_l,
@@ -73,21 +70,29 @@ class ObjectOperator(bpy.types.Operator):
             "foot_r": context.scene.foot_r,
             "toe_l": context.scene.toe_l,
             "toe_r": context.scene.toe_r,
-            "heel_l": context.scene.heel_l,
             "heel_r": context.scene.heel_r,
-
-            "fingers_bool_r": context.scene.fingers_bool_r,
-            "fingers_bool_l": context.scene.fingers_bool_l,
-            "copy_loc_constr": context.scene.copy_loc_constr,
-            "generation_mode": context.scene.generation_mode,
-            "merge_extra_bone_whitelist": [
-                item.value
-                for item in context.scene.merge_extra_bone_whitelist
-                if item.value
-            ],
+            "heel_l": context.scene.heel_l,
         }
 
-        objects = bpy.context.selected_objects
-        generate_rig(self, objects, params)
+        # ===========================================================
+        mapping_folder = get_mapping_folder()
+
+        # ===========================================================
+        # Serializing json
+        json_object = json.dumps(prop_dict, indent=4)
+
+        if context.scene.json_file_name != "":
+            context.scene.json_file_name = context.scene.json_file_name.replace(
+                ".json", "")
+            json_file_name = f"{context.scene.json_file_name}.json"
+            json_path = f"{mapping_folder}/{json_file_name}"
+
+            # Writing to sample.json
+            with open(json_path, "w", encoding="utf-8") as outfile:
+                outfile.write(json_object)
+            context.scene.json_file_name = ""
+            self.report({"INFO"}, f"{context.scene.presets} preset saved")
+        else:
+            self.report({"ERROR"}, "Enter preset name fist")
 
         return {"FINISHED"}

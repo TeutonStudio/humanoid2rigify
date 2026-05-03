@@ -1,17 +1,18 @@
+from typing import Type
+
 import bpy
 
-from . import importieren, objekt, speichern, umbennen, vernichten
+from . import übernahme, übernahme, zuordnung, vorlagen
+from .__operator__ import Operator
 
-_CLASSES = [
-    objekt.ObjectOperator,
-    speichern.MappingSaveOperator,
-    importieren.MappingImportOperator,
-    vernichten.MappingDeleteOperator,
-    umbennen.MappingRenameOperator,
+_MODULES: list = [
+    übernahme,
+    zuordnung,
+    vorlagen,
 ]
 
 def register():
-    for c in _CLASSES: bpy.utils.register_class(c)
+    for m in _MODULES: bpy.utils.register_class(m)
 
 def unregister():
-    for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
+    for m in reversed(_MODULES): bpy.utils.unregister_class(m)

@@ -3,7 +3,6 @@ import os
 
 from ..__methoden__ import get_mapping_folder
 
-
 def my_settings_callback(scene, context):
     # get to mapping_templates folder or create if there isn't one
     mapping_folder = get_mapping_folder()
@@ -22,3 +21,6 @@ def my_settings_callback(scene, context):
         items.append(s)
 
     return items
+
+
+

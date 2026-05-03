@@ -1,9 +1,10 @@
 import bpy
 import os
 
-from ..__methoden__ import get_mapping_folder
+from operatoren.__operator__ import Operator
+from __methoden__ import get_mapping_folder
 
-class MappingDeleteOperator(bpy.types.Operator):
+class MappingDeleteOperator(Operator):
 
     bl_idname = "opr.mapping_delete_operator"
     bl_label = "mapping_templates_delete"

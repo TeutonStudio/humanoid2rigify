@@ -23,4 +23,4 @@ def register():
     for m in _MODULES: m.register()
 
 def unregister():
-    for m in _MODULES: m.unregister()
+    for m in reversed(_MODULES): m.unregister()
