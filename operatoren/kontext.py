@@ -50,6 +50,7 @@ def create_generation_context(operator, armature_obj, params):
         armature_obj,
         extra_bones,
         weighted_vertex_groups,
+        params,
     )
 
     used_deform_bones = sorted(

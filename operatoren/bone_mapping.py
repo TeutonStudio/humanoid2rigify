@@ -1,6 +1,17 @@
 from fnmatch import fnmatchcase
 
 
+DEFAULT_MERGE_EXTRA_BONE_WHITELIST = [
+    "rig",
+    "properties",
+    "clothes",
+    "gen_donger_*",
+    "gen_teste_r",
+    "gen_teste_l",
+    "anus_open",
+]
+
+
 PARAM_BONE_KEYS = [
     "head",
     "first_neck",
@@ -74,23 +85,26 @@ GENERATED_HELPER_BONES = {
 }
 
 DEF_EXCLUDED_TARGET_NAMES = {"torso", "neck", "chest"}
-MERGE_EXTRA_BONE_WHITELIST = [
-    "rig",
-    "properties",
-    "clothes",
-    "gen_donger_*",
-    "gen_teste_r",
-    "gen_teste_l",
-    "anus_open",
-]
 
 
 def unique_non_empty(values):
     return list(dict.fromkeys([value for value in values if value]))
 
 
-def is_merge_extra_bone_name(bone_name):
-    return any(fnmatchcase(bone_name, pattern) for pattern in MERGE_EXTRA_BONE_WHITELIST)
+def get_merge_extra_bone_whitelist(params):
+    whitelist = params.get("merge_extra_bone_whitelist", [])
+    cleaned_whitelist = [pattern.strip() for pattern in whitelist if pattern and pattern.strip()]
+    if cleaned_whitelist:
+        return cleaned_whitelist
+
+    return DEFAULT_MERGE_EXTRA_BONE_WHITELIST
+
+
+def is_merge_extra_bone_name(bone_name, params):
+    return any(
+        fnmatchcase(bone_name, pattern)
+        for pattern in get_merge_extra_bone_whitelist(params)
+    )
 
 
 def get_standard_source_bone_names(params):
@@ -307,7 +321,7 @@ def collect_extra_bones(armature_obj, params, derived_data):
     )
 
 
-def build_extra_bone_data(armature_obj, extra_bones, weighted_vertex_groups):
+def build_extra_bone_data(armature_obj, extra_bones, weighted_vertex_groups, params):
     extra_bone_data = {}
     for bone_name in extra_bones:
         bone = get_bone(armature_obj, bone_name)
@@ -315,7 +329,7 @@ def build_extra_bone_data(armature_obj, extra_bones, weighted_vertex_groups):
             continue
 
         has_weights = bone_name in weighted_vertex_groups
-        needs_new_merge_bone = is_merge_extra_bone_name(bone_name)
+        needs_new_merge_bone = is_merge_extra_bone_name(bone_name, params)
         extra_bone_data[bone_name] = {
             "source_bone": bone_name,
             "constraint_target": bone_name,

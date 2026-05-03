@@ -1,23 +1,64 @@
 import bpy
 
-from bpy.props import StringProperty,BoolProperty,EnumProperty
+from bpy.props import (
+    StringProperty,
+    BoolProperty,
+    EnumProperty,
+    CollectionProperty,
+)
 
 from .__methoden__ import my_settings_callback
+
+
+DEFAULT_MERGE_EXTRA_BONE_WHITELIST = [
+    "rig",
+    "properties",
+    "clothes",
+    "gen_donger_*",
+    "gen_teste_r",
+    "gen_teste_l",
+    "anus_open",
+]
+
+
+class MergeWhitelistItem(bpy.types.PropertyGroup):
+    pattern: StringProperty(name="Pattern", default="")
+
+
+def ensure_merge_whitelist(scene):
+    collection = getattr(scene, "merge_extra_bone_whitelist", None)
+    if collection is None or len(collection) != 0:
+        return
+
+    for pattern in DEFAULT_MERGE_EXTRA_BONE_WHITELIST:
+        item = collection.add()
+        item.pattern = pattern
 
 
 def unregister():
     for (prop_name, _) in PROPS:
         delattr(bpy.types.Scene, prop_name)
+    for cls in reversed(CLASSES):
+        bpy.utils.unregister_class(cls)
 
 
 def register():
+    for cls in CLASSES:
+        bpy.utils.register_class(cls)
     for (prop_name, prop_value) in PROPS:
         setattr(bpy.types.Scene, prop_name, prop_value)
+
+
+CLASSES = [
+    MergeWhitelistItem,
+]
+
 
 PROPS = [
     ("copy_loc_constr", BoolProperty(name="Stretch", default=True)),
     ("fingers_bool_r", BoolProperty(name="right fingers", default=True)),
     ("fingers_bool_l", BoolProperty(name="left fingers", default=True)),
+    ("merge_extra_bone_whitelist", CollectionProperty(type=MergeWhitelistItem)),
     (
         "generation_mode",
         EnumProperty(

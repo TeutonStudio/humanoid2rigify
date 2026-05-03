@@ -1,6 +1,7 @@
 import bpy
 
 from .__methoden__ import generate_rig
+from ..schnittstelle.eigenschaften import ensure_merge_whitelist
 
 
 class ObjectOperator(bpy.types.Operator):
@@ -9,6 +10,7 @@ class ObjectOperator(bpy.types.Operator):
     bl_options = {"UNDO"}
 
     def execute(self, context):
+        ensure_merge_whitelist(context.scene)
         params = {
             "head": context.scene.head,
             "first_neck": context.scene.first_neck,
@@ -78,6 +80,11 @@ class ObjectOperator(bpy.types.Operator):
             "fingers_bool_l": context.scene.fingers_bool_l,
             "copy_loc_constr": context.scene.copy_loc_constr,
             "generation_mode": context.scene.generation_mode,
+            "merge_extra_bone_whitelist": [
+                item.pattern
+                for item in context.scene.merge_extra_bone_whitelist
+                if item.pattern.strip()
+            ],
         }
 
         objects = bpy.context.selected_objects
