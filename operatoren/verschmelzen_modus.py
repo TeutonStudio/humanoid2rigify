@@ -2,6 +2,7 @@ import bpy
 
 from . import any_rig_to_rigify_v2
 from .backup import create_backups
+from .custom_shapes import inherit_missing_custom_shapes
 from .rigify_access import (
     ensure_target_bone_from_source,
     get_generated_rigify_object,
@@ -149,6 +150,11 @@ def run_merge_mode(context):
         return False
 
     ensured_targets = ensure_required_merge_bones(context, rigify_obj)
+    copied_shapes = inherit_missing_custom_shapes(
+        context,
+        rigify_obj,
+        "merge_target",
+    )
     migrated_groups = migrate_vertex_groups(context, rigify_obj)
     rebound_meshes = rebind_meshes_to_rigify(context, rigify_obj)
 
@@ -162,6 +168,7 @@ def run_merge_mode(context):
         (
             f"Backup erstellt: {context.backup_collection.name}. "
             f"Verschmolzen, {len(ensured_targets)} Zielknochen gesichert, "
+            f"{copied_shapes} fehlende Custom Shapes uebernommen, "
             f"{migrated_groups} Vertex-Groups migriert, "
             f"{rebound_meshes} Meshes umgehaengt."
         ),

@@ -3,6 +3,8 @@ import bpy
 from . import any_rig_to_rigify_v2
 from .armature_cleanup import compute_deform_mode_keep_bones
 from .backup import create_backups
+from .custom_shapes import inherit_missing_custom_shapes
+from .rigify_access import get_generated_rigify_object
 
 
 def make_armature_active(armature_obj):
@@ -50,6 +52,14 @@ def run_deform_mode(context):
 
     create_backups(context)
     any_rig_to_rigify_v2.the_script(context.source_armature, context.params)
+    rigify_obj = get_generated_rigify_object(context.source_armature)
+    copied_shapes = 0
+    if rigify_obj is not None:
+        copied_shapes = inherit_missing_custom_shapes(
+            context,
+            rigify_obj,
+            "constraint_target",
+        )
 
     make_armature_active(context.source_armature)
     keep_bones = compute_deform_mode_keep_bones(context)
@@ -68,7 +78,8 @@ def run_deform_mode(context):
         {"INFO"},
         (
             f"Backup erstellt: {context.backup_collection.name}. "
-            f"Deformationsrig reduziert, {len(removed_bones)} Knochen entfernt."
+            f"Deformationsrig reduziert, {len(removed_bones)} Knochen entfernt. "
+            f"{copied_shapes} fehlende Custom Shapes uebernommen."
         ),
     )
     return True
