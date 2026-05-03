@@ -2,6 +2,7 @@ from operatoren import any_rig_to_rigify_v2
 from operatoren.backup import create_backups
 from operatoren.kontext import create_generation_context
 from operatoren.deform_modus import run_deform_mode
+from operatoren.verschmelzen_modus import run_merge_mode
 from operatoren.validierung import get_generation_blocker_message
 
 
@@ -35,16 +36,7 @@ def dispatch_generation(operator, armature_obj, params):
         return run_deform_mode(context)
 
     if context.generation_mode == MODE_MERGE_WITH_NEW_RIGIFY:
-        operator.report(
-            {"INFO"},
-            (
-                "Analyse vorbereitet: "
-                f"{len(context.used_deform_bones)} benutzte Deform-Bones, "
-                f"{len(context.extra_bones)} Zusatzknochen. "
-                "Der Verschmelzungs-Modus folgt im naechsten Umbauabschnitt."
-            ),
-        )
-        return False
+        return run_merge_mode(context)
 
     operator.report({"ERROR"}, "Unbekannter Erzeugungsmodus")
     return False
