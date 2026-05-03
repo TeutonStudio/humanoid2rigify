@@ -142,6 +142,22 @@ def set_rigify_layer_param(rigify_param, attr_name, layer_index):
         layer_config[layer_index] = True
 
 
+def set_rigify_collection_param(armature_data, rigify_param, attr_name, collection_name):
+    ref_list = getattr(rigify_param, f"{attr_name}_coll_refs", None)
+    if ref_list is None:
+        return False
+
+    while len(ref_list) != 0:
+        ref_list.remove(len(ref_list) - 1)
+
+    bone_collection = armature_data.collections_all.get(collection_name)
+    if bone_collection is None:
+        return False
+
+    ref_list.add().set_collection(bone_collection)
+    return True
+
+
 def get_current_target_collection():
     active_layer_collection = getattr(bpy.context.view_layer, "active_layer_collection", None)
     if active_layer_collection is not None and active_layer_collection.collection is not None:
@@ -1447,22 +1463,21 @@ def the_script(skeleton_model, parameters):
     #         pose_bone.rigify_parameters.rotation_axis = "x"
 
     # # ===============================================================
-    # assign fk_layers
     fk_layer = {
-        # bone : [fk, tweak]
-        thigh_l: [14, 15],
-        thigh_r: [17, 18],
-        uparm_r: [11, 12],
-        uparm_l: [8, 9],
-        first_spine: [4, 4],
-        first_neck: [None, 1],
+        # bone : [fk_collection, tweak_collection]
+        thigh_l: ["Leg.L (FK)", "Leg.L (Tweak)"],
+        thigh_r: ["Leg.R (FK)", "Leg.R (Tweak)"],
+        uparm_r: ["Arm.R (FK)", "Arm.R (Tweak)"],
+        uparm_l: ["Arm.L (FK)", "Arm.L (Tweak)"],
+        first_spine: ["Torso (Tweak)", "Torso (Tweak)"],
+        first_neck: [None, "Torso (Tweak)"],
     }
 
     fingers_tweak = [
         x for x in finger_bones if x in all_metarig_bone_names]
 
     for i in fingers_tweak:
-        fk_layer[i] = [None, 6]
+        fk_layer[i] = [None, "Fingers (Detail)"]
 
     cnt = 0
     all_metarig_bone_names = get_all_bone_names(METARIG_OBJ)
@@ -1472,18 +1487,26 @@ def the_script(skeleton_model, parameters):
             pose_bone = METARIG_OBJ.pose.bones[bone]
             rigify_param = pose_bone.rigify_parameters
 
-            fk_layer_index = layer[0]
-            tweak_layer_index = layer[1]
+            fk_collection_name = layer[0]
+            tweak_collection_name = layer[1]
 
             # if bones has fk layer
-            if layer[0] != None:
-                set_rigify_layer_param(
-                    rigify_param, "fk_layers", fk_layer_index)
+            if fk_collection_name is not None:
+                set_rigify_collection_param(
+                    METARIG_OBJ.data,
+                    rigify_param,
+                    "fk",
+                    fk_collection_name,
+                )
 
             # if bones doesn't have fk layer
-            if layer[1] != None:
-                set_rigify_layer_param(
-                    rigify_param, "tweak_layers", tweak_layer_index)
+            if tweak_collection_name is not None:
+                set_rigify_collection_param(
+                    METARIG_OBJ.data,
+                    rigify_param,
+                    "tweak",
+                    tweak_collection_name,
+                )
 
     # remove rigify type on the root bone
     if "root" in all_metarig_bone_names:

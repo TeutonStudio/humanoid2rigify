@@ -1,3 +1,6 @@
+from fnmatch import fnmatchcase
+
+
 PARAM_BONE_KEYS = [
     "head",
     "first_neck",
@@ -71,17 +74,15 @@ GENERATED_HELPER_BONES = {
 }
 
 DEF_EXCLUDED_TARGET_NAMES = {"torso", "neck", "chest"}
-MERGE_EXTRA_BONE_EXACT_NAMES = {
+MERGE_EXTRA_BONE_WHITELIST = [
     "rig",
     "properties",
     "clothes",
+    "gen_donger_*",
     "gen_teste_r",
     "gen_teste_l",
     "anus_open",
-}
-MERGE_EXTRA_BONE_PREFIXES = (
-    "gen_donger_",
-)
+]
 
 
 def unique_non_empty(values):
@@ -89,10 +90,7 @@ def unique_non_empty(values):
 
 
 def is_merge_extra_bone_name(bone_name):
-    if bone_name in MERGE_EXTRA_BONE_EXACT_NAMES:
-        return True
-
-    return any(bone_name.startswith(prefix) for prefix in MERGE_EXTRA_BONE_PREFIXES)
+    return any(fnmatchcase(bone_name, pattern) for pattern in MERGE_EXTRA_BONE_WHITELIST)
 
 
 def get_standard_source_bone_names(params):
