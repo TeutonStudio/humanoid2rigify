@@ -113,9 +113,12 @@ def rebind_meshes_to_rigify(context, rigify_obj):
     return rebound_meshes
 
 
-def delete_source_armature(source_armature):
-    make_object_active(source_armature)
-    bpy.ops.object.mode_set(mode="OBJECT")
+def delete_source_armature(source_armature, fallback_active_obj=None):
+    if fallback_active_obj is not None:
+        make_object_active(fallback_active_obj)
+    else:
+        make_object_active(source_armature)
+
     bpy.data.objects.remove(source_armature, do_unlink=True)
 
 
@@ -149,7 +152,8 @@ def run_merge_mode(context):
     migrated_groups = migrate_vertex_groups(context, rigify_obj)
     rebound_meshes = rebind_meshes_to_rigify(context, rigify_obj)
 
-    delete_source_armature(context.source_armature)
+    make_object_active(rigify_obj)
+    delete_source_armature(context.source_armature, fallback_active_obj=rigify_obj)
     make_object_active(rigify_obj)
     bpy.ops.object.mode_set(mode="POSE")
 

@@ -13,7 +13,13 @@ def get_generated_rigify_object(source_armature):
 
 
 def make_object_active(obj):
-    bpy.ops.object.mode_set(mode="OBJECT")
+    active_object = bpy.context.view_layer.objects.active
+    if active_object is not None:
+        try:
+            bpy.ops.object.mode_set(mode="OBJECT")
+        except RuntimeError:
+            pass
+
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
