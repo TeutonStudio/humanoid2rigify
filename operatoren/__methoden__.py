@@ -1,6 +1,6 @@
 import bpy
 
-from operatoren import any_rig_to_rigify_v2
+from operatoren.erzeugung_dispatcher import dispatch_generation
 
 
 def generate_rig(self, objects, params):
@@ -24,4 +24,4 @@ def generate_rig(self, objects, params):
             # make armature active object
             arm.select_set(True)
             bpy.context.view_layer.objects.active = arm
-            any_rig_to_rigify_v2.the_script(arm, params)
+            dispatch_generation(self, arm, params)
