@@ -79,7 +79,7 @@ def run_deform_mode(context):
         (
             f"Backup erstellt: {context.backup_collection.name}. "
             f"Deformationsrig reduziert, {len(removed_bones)} Knochen entfernt. "
-            f"{copied_shapes} fehlende Custom Shapes uebernommen."
+            f"{copied_shapes} Custom Shapes uebernommen oder ersetzt."
         ),
     )
     return True

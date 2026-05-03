@@ -168,7 +168,7 @@ def run_merge_mode(context):
         (
             f"Backup erstellt: {context.backup_collection.name}. "
             f"Verschmolzen, {len(ensured_targets)} Zielknochen gesichert, "
-            f"{copied_shapes} fehlende Custom Shapes uebernommen, "
+            f"{copied_shapes} Custom Shapes uebernommen oder ersetzt, "
             f"{migrated_groups} Vertex-Groups migriert, "
             f"{rebound_meshes} Meshes umgehaengt."
         ),

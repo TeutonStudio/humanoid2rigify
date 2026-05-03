@@ -28,7 +28,7 @@ def run_constraint_mode(context):
         {"INFO"},
         (
             f"Backup erstellt: {context.backup_collection.name}. "
-            f"{copied_shapes} fehlende Custom Shapes uebernommen."
+            f"{copied_shapes} Custom Shapes uebernommen oder ersetzt."
         ),
     )
     return True

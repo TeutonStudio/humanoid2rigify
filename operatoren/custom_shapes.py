@@ -1,3 +1,7 @@
+GENERIC_CIRCLE_WIDGET_VERTEX_COUNT = 32
+ROOT_BONE_NAME = "root"
+
+
 def copy_bone_color(source_color, target_color):
     target_color.palette = source_color.palette
     for custom_field in ("normal", "select", "active"):
@@ -9,6 +13,9 @@ def resolve_target_transform_bone(context, source_pose_bone, rigify_obj, target_
     transform_bone = getattr(source_pose_bone, "custom_shape_transform", None)
     if transform_bone is None:
         return None
+
+    if transform_bone.name == ROOT_BONE_NAME:
+        return rigify_obj.pose.bones.get(ROOT_BONE_NAME)
 
     transform_mapping = context.source_to_target_map.get(transform_bone.name)
     if transform_mapping is not None:
@@ -33,20 +40,80 @@ def copy_custom_shape_settings(source_pose_bone, target_pose_bone, target_transf
     target_pose_bone.custom_shape_transform = target_transform_bone
 
 
-def inherit_missing_custom_shapes(context, rigify_obj, target_name_key):
-    copied_count = 0
+def is_generic_circle_widget(widget_obj):
+    if widget_obj is None or getattr(widget_obj, "type", None) != "MESH":
+        return False
+
+    mesh = getattr(widget_obj, "data", None)
+    if mesh is None or len(mesh.polygons) != 0:
+        return False
+
+    return (
+        len(mesh.vertices) == GENERIC_CIRCLE_WIDGET_VERTEX_COUNT
+        and len(mesh.edges) == GENERIC_CIRCLE_WIDGET_VERTEX_COUNT
+    )
+
+
+def should_replace_custom_shape(source_pose_bone, target_pose_bone, mapping):
+    if source_pose_bone.custom_shape is None:
+        return False
+
+    if target_pose_bone.custom_shape is None:
+        return True
+
+    if target_pose_bone.name == ROOT_BONE_NAME:
+        return True
+
+    if not mapping.get("is_standard", True):
+        return True
+
+    return is_generic_circle_widget(target_pose_bone.custom_shape)
+
+
+def iter_shape_mappings(context, rigify_obj, target_name_key):
+    yielded_pairs = set()
 
     for source_bone_name, mapping in context.source_to_target_map.items():
         target_bone_name = mapping.get(target_name_key)
         if not target_bone_name:
             continue
 
+        pair_key = (source_bone_name, target_bone_name)
+        if pair_key in yielded_pairs:
+            continue
+
+        yielded_pairs.add(pair_key)
+        yield source_bone_name, target_bone_name, mapping
+
+    source_root = context.source_armature.pose.bones.get(ROOT_BONE_NAME)
+    target_root = rigify_obj.pose.bones.get(ROOT_BONE_NAME)
+    if source_root is None or target_root is None:
+        return
+
+    pair_key = (ROOT_BONE_NAME, ROOT_BONE_NAME)
+    if pair_key in yielded_pairs:
+        return
+
+    yield ROOT_BONE_NAME, ROOT_BONE_NAME, {
+        "source_bone": ROOT_BONE_NAME,
+        "is_standard": False,
+    }
+
+
+def inherit_missing_custom_shapes(context, rigify_obj, target_name_key):
+    copied_count = 0
+
+    for source_bone_name, target_bone_name, mapping in iter_shape_mappings(
+        context,
+        rigify_obj,
+        target_name_key,
+    ):
         source_pose_bone = context.source_armature.pose.bones.get(source_bone_name)
         target_pose_bone = rigify_obj.pose.bones.get(target_bone_name)
         if source_pose_bone is None or target_pose_bone is None:
             continue
 
-        if target_pose_bone.custom_shape is not None or source_pose_bone.custom_shape is None:
+        if not should_replace_custom_shape(source_pose_bone, target_pose_bone, mapping):
             continue
 
         target_transform_bone = resolve_target_transform_bone(
