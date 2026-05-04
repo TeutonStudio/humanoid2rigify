@@ -1,6 +1,4 @@
-import bpy
-
-from ..__operator__ import Operator, Operatoren
+from ..__operator__ import Operatoren, Operator
 
 
 class OPR_add_merge_whitelist_group(Operator):
@@ -9,13 +7,10 @@ class OPR_add_merge_whitelist_group(Operator):
     bl_options = {"UNDO"}
 
     def execute(self, context):
-        groups = context.scene.merge_extra_bone_groups
-
-        group = groups.add()
+        group = context.scene.merge_extra_bone_groups.add()
         group.name = "Neue Gruppe"
         group.expanded = True
-        group.active_index = -1
-
-        context.scene.merge_extra_bone_group_active_index = len(groups) - 1
-
+        context.scene.merge_extra_bone_group_active_index = (
+            len(context.scene.merge_extra_bone_groups) - 1
+        )
         return {"FINISHED"}

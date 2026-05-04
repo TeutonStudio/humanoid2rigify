@@ -10,8 +10,13 @@ from .__methoden__ import my_settings_callback
 
 
 class MergeWhitelistItem(bpy.types.PropertyGroup):
-    value: StringProperty(name="Value", default="")
+    value: StringProperty(name="Bone Pattern", default="")
 
+class MergeWhitelistGroup(bpy.types.PropertyGroup):
+    name: StringProperty(name="Name", default="Additional")
+    expanded: BoolProperty(name="Aufgeklappt", default=True)
+    entries: CollectionProperty(type=MergeWhitelistItem)
+    active_index: IntProperty(default=-1)
 
 def unregister():
     for (prop_name, _) in PROPS:
@@ -30,31 +35,8 @@ def register():
 
 CLASSES = [
     MergeWhitelistItem,
+    MergeWhitelistGroup,
 ]
-
-
-class MergeWhitelistItem(bpy.types.PropertyGroup):
-    value: StringProperty(name="Value", default="")
-
-
-def unregister():
-    for (prop_name, _) in PROPS:
-        delattr(bpy.types.Scene, prop_name)
-    for cls in reversed(CLASSES):
-        bpy.utils.unregister_class(cls)
-
-
-def register():
-    for cls in CLASSES:
-        bpy.utils.register_class(cls)
-    for (prop_name, prop_value) in PROPS:
-        setattr(bpy.types.Scene, prop_name, prop_value)
-
-
-CLASSES = [
-    MergeWhitelistItem,
-]
-
 
 def _liste_seite(liste:Callable[[str],Iterator[str]]) -> Iterator[str]:
     for seite in Seite: yield from liste(seite.value)
@@ -68,8 +50,6 @@ class Seite(str,Enum):
         if self == Seite.RECHTS: return "Rechts"
         return ""
 
-type KEnum = type[KnochenEnum] | type[LRKnochenEnum]
-
 class KnochenEnum(str,Enum):
     @classmethod
     def knochen(cls) -> Iterator[str]:
@@ -79,6 +59,8 @@ class LRKnochenEnum(str,Enum):
     @classmethod
     def knochen(cls,seiten_suffix:str) -> Iterator[str]:
         for knochen in cls: yield f"{knochen.value}_{seiten_suffix}"
+
+type KEnum = type[KnochenEnum] | type[LRKnochenEnum]
 
 class Wirbelsäule(KnochenEnum):
     WURZEL = "root"
@@ -199,7 +181,8 @@ PROPS = [
     ("copy_loc_constr", BoolProperty(name="Stretch", default=True)),
     ("fingers_bool_r", BoolProperty(name="right fingers", default=True)),
     ("fingers_bool_l", BoolProperty(name="left fingers", default=True)),
-    ("merge_extra_bone_whitelist", CollectionProperty(type=MergeWhitelistItem)),
+    ("merge_extra_bone_groups", CollectionProperty(type=MergeWhitelistGroup)),
+    ("merge_extra_bone_group_active_index", IntProperty(default=-1)),
     (
         "generation_mode",
         EnumProperty(

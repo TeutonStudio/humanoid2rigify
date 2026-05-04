@@ -80,6 +80,35 @@ DEF_EXCLUDED_TARGET_NAMES = {"torso", "neck", "chest"}
 def unique_non_empty(values):
     return list(dict.fromkeys([value for value in values if value]))
 
+def get_merge_extra_bone_groups(params):
+    groups = params.get("merge_extra_bone_groups", [])
+
+    if groups:
+        return groups
+
+    # Fallback für alte Presets
+    whitelist = get_merge_extra_bone_whitelist(params)
+    return [
+        {
+            "name": "Additional",
+            "entries": whitelist,
+        },
+    ]
+
+def find_merge_extra_bone_group(bone_name, params):
+    for group_index, group in enumerate(get_merge_extra_bone_groups(params)):
+        group_name = group.get("name", "Additional")
+        entries = group.get("entries", [])
+
+        for pattern in entries:
+            if pattern and fnmatchcase(bone_name, pattern):
+                return {
+                    "index": group_index,
+                    "name": group_name,
+                    "pattern": pattern,
+                }
+
+    return None
 
 def get_merge_extra_bone_whitelist(params):
     whitelist = params.get("merge_extra_bone_whitelist", [])
@@ -319,12 +348,11 @@ def build_extra_bone_data(armature_obj, extra_bones, weighted_vertex_groups, par
         if bone is None:
             continue
 
-        needs_new_merge_bone = is_merge_extra_bone_name(bone_name, params)
+        group_data = find_merge_extra_bone_group(bone_name, params)
 
         # Harte Whitelist:
-        # Nicht-whitelisted Extra-Bones bekommen kein Zielmapping
-        # und dürfen später nicht im neuen Rigify-Rig landen.
-        if not needs_new_merge_bone:
+        # Nicht gematchte Extra-Bones werden NICHT ins neue Rigify übernommen.
+        if group_data is None:
             continue
 
         has_weights = bone_name in weighted_vertex_groups
@@ -339,6 +367,11 @@ def build_extra_bone_data(armature_obj, extra_bones, weighted_vertex_groups, par
             "is_hidden": bone.hide,
             "keep_in_deform_mode": bone.use_deform and has_weights,
             "needs_new_merge_bone": True,
+
+            # Neu:
+            "whitelist_group_index": group_data["index"],
+            "whitelist_group_name": group_data["name"],
+            "whitelist_pattern": group_data["pattern"],
         }
 
     return extra_bone_data

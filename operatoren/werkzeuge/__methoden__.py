@@ -11,16 +11,22 @@ def build_params(scene) -> dict[str,str | list[str]]:
         str(name): getattr(scene, name)
         for name in KNOCHEN
     }
+    merge_groups = build_merge_extra_bone_groups(scene)
 
     params.update({
         "fingers_bool_r": scene.fingers_bool_r,
         "fingers_bool_l": scene.fingers_bool_l,
         "copy_loc_constr": scene.copy_loc_constr,
         "generation_mode": scene.generation_mode,
+
+        # Neu:
+        "merge_extra_bone_groups": merge_groups,
+
+        # Kompatibilität:
         "merge_extra_bone_whitelist": [
-            item.value
-            for item in scene.merge_extra_bone_whitelist
-            if item.value
+            entry
+            for group in merge_groups
+            for entry in group["entries"]
         ],
     })
 
@@ -33,3 +39,23 @@ def bone_item_list(self: Operator, context: Context) -> list[tuple[str, str, str
         (bone_name, bone_name, bone_name)
         for bone_name in bone_names
     ]
+
+def build_merge_extra_bone_groups(scene) -> list[dict]:
+    groups = []
+
+    for group in scene.merge_extra_bone_groups:
+        entries = [
+            item.value
+            for item in group.entries
+            if item.value
+        ]
+
+        if not entries:
+            continue
+
+        groups.append({
+            "name": group.name or "Additional",
+            "entries": entries,
+        })
+
+    return groups

@@ -1,6 +1,6 @@
 import bpy
 
-from ..__operator__ import Operator, Operatoren
+from ..__operator__ import Operatoren, Operator
 
 
 class OPR_remove_merge_whitelist_group(Operator):
