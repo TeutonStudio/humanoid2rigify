@@ -35,8 +35,10 @@ class RigifyBauModus:
             self.source_armature,
             self.params,
         )
+        rigify_obj =get_generated_rigify_object(self.source_armature)
+        faerbe_fk_knochen_gruen(rigify_obj)
 
-        return get_generated_rigify_object(self.source_armature)
+        return rigify_obj
 
     def generiere_rigify_rig(self, skeleton_model, parameters) -> None:
         """
@@ -169,6 +171,172 @@ class RigifyBauModus:
             bone_collection.is_visible = True
             return bone_collection
 
+        EXTRA_GROUP_COLLECTION_PREFIX = "Extra"
+
+        def sanitize_extra_group_name(value: str, fallback: str = "Additional") -> str:
+            value = (value or "").strip()
+            return value if value else fallback
+
+        def extra_group_collection_name(group_name: str) -> str:
+            group_name = sanitize_extra_group_name(group_name)
+            return f"{EXTRA_GROUP_COLLECTION_PREFIX}: {group_name}"
+
+        def is_extra_group_collection(collection) -> bool:
+            return collection.name.startswith(f"{EXTRA_GROUP_COLLECTION_PREFIX}:")
+
+        def get_max_rigify_ui_row(armature_data) -> int:
+            if not uses_bone_collections(armature_data):
+                return 0
+
+            max_row = 0
+
+            for collection in armature_data.collections_all:
+                if is_extra_group_collection(collection):
+                    continue
+
+                row = getattr(collection, "rigify_ui_row", 0)
+
+                if row > max_row:
+                    max_row = row
+
+            return max_row
+
+        def build_extra_group_ui_rows(armature_data) -> dict[str, int]:
+            """
+            Erstellt stabile UI-Zeilen für alle Whitelist-Gruppen.
+            Startet nach der letzten bereits vorhandenen Nicht-Extra-Rigify-UI-Zeile.
+            +2 lässt eine Leerzeile Abstand zur Standard-Rigify-Liste.
+            """
+            start_row = get_max_rigify_ui_row(armature_data) + 2
+            rows: dict[str, int] = {}
+
+            for data in self.context.extra_bone_data.values():
+                if not data.get("needs_new_merge_bone", False):
+                    continue
+
+                group_name = sanitize_extra_group_name(
+                    data.get("whitelist_group_name", "Additional")
+                )
+
+                if group_name not in rows:
+                    rows[group_name] = start_row + len(rows)
+
+            return rows
+
+        def get_or_create_extra_group_collection(
+            armature_data,
+            group_name: str,
+            ui_row: int,
+        ):
+            group_name = sanitize_extra_group_name(group_name)
+            collection_name = extra_group_collection_name(group_name)
+
+            bone_collection = armature_data.collections_all.get(collection_name)
+
+            if bone_collection is None:
+                bone_collection = armature_data.collections.new(collection_name)
+
+            if hasattr(bone_collection, "rigify_ui_row"):
+                bone_collection.rigify_ui_row = ui_row
+
+            if hasattr(bone_collection, "rigify_ui_title"):
+                bone_collection.rigify_ui_title = group_name
+
+            bone_collection.is_visible = True
+
+            return bone_collection
+
+        def assign_bone_to_extra_group_collection(
+            obj,
+            bone_name: str,
+            group_name: str,
+            ui_row: int,
+        ) -> None:
+            armature_data = obj.data
+            bone = armature_data.bones.get(bone_name)
+
+            if bone is None:
+                return
+
+            if not uses_bone_collections(armature_data):
+                assign_bone_to_layer_group(obj, bone_name, 27)
+                return
+
+            target_collection = get_or_create_extra_group_collection(
+                armature_data,
+                group_name,
+                ui_row,
+            )
+
+            for collection in armature_data.collections_all:
+                try:
+                    collection.unassign(bone)
+                except RuntimeError:
+                    pass
+
+            target_collection.assign(bone)
+
+        def apply_extra_group_collections(obj, extra_group_ui_rows: dict[str, int]) -> list[str]:
+            if obj is None or obj.type != "ARMATURE":
+                return []
+
+            if not uses_bone_collections(obj.data):
+                return []
+
+            assigned_collection_names: list[str] = []
+
+            for source_bone_name, data in self.context.extra_bone_data.items():
+                if not data.get("needs_new_merge_bone", False):
+                    continue
+
+                group_name = sanitize_extra_group_name(
+                    data.get("whitelist_group_name", "Additional")
+                )
+
+                ui_row = extra_group_ui_rows.get(group_name)
+
+                if ui_row is None:
+                    continue
+
+                collection_name = extra_group_collection_name(group_name)
+
+                # Preferiere sichtbare Steuerknochen. DEF-Bones nur als Fallback.
+                candidate_bone_names = [
+                    data.get("constraint_target"),
+                    source_bone_name,
+                    data.get("merge_target"),
+                ]
+
+                assigned_bone = False
+                seen_names: set[str] = set()
+
+                for candidate_bone_name in candidate_bone_names:
+                    if not candidate_bone_name:
+                        continue
+
+                    if candidate_bone_name in seen_names:
+                        continue
+
+                    seen_names.add(candidate_bone_name)
+
+                    if obj.data.bones.get(candidate_bone_name) is None:
+                        continue
+
+                    assign_bone_to_extra_group_collection(
+                        obj,
+                        candidate_bone_name,
+                        group_name,
+                        ui_row,
+                    )
+
+                    assigned_bone = True
+                    break
+
+                if assigned_bone and collection_name not in assigned_collection_names:
+                    assigned_collection_names.append(collection_name)
+
+            return assigned_collection_names
+
         def assign_bone_to_layer_group(obj, bone_name: str, layer_index: int) -> None:
             armature_data = obj.data
             bone = armature_data.bones.get(bone_name)
@@ -197,7 +365,11 @@ class RigifyBauModus:
                 if index != layer_index:
                     bone.layers[index] = False
 
-        def set_visible_rig_layers(obj, layer_indices) -> None:
+        def set_visible_rig_layers(
+            obj,
+            layer_indices,
+            extra_collection_names=(),
+        ) -> None:
             armature_data = obj.data
 
             if uses_bone_collections(armature_data):
@@ -205,6 +377,8 @@ class RigifyBauModus:
                     get_collection_name(layer_index)
                     for layer_index in layer_indices
                 }
+
+                visible_collections.update(extra_collection_names)
 
                 for collection in armature_data.collections_all:
                     collection.is_visible = collection.name in visible_collections
@@ -1265,6 +1439,7 @@ class RigifyBauModus:
 
         # Zusatzknochen
         ensure_mode(metarig_obj, "POSE")
+        metarig_extra_group_ui_rows = build_extra_group_ui_rows(metarig_obj.data)
 
         for bone_name in extra_bones:
             pose_bone = metarig_obj.pose.bones.get(bone_name)
@@ -1273,7 +1448,22 @@ class RigifyBauModus:
                 continue
 
             pose_bone.rigify_type = "basic.super_copy"
-            assign_bone_to_layer_group(metarig_obj, bone_name, 27)
+
+            extra_data = self.context.extra_bone_data.get(bone_name, {})
+            group_name = sanitize_extra_group_name(
+                extra_data.get("whitelist_group_name", "Additional")
+            )
+            ui_row = metarig_extra_group_ui_rows.get(group_name)
+
+            if ui_row is not None:
+                assign_bone_to_extra_group_collection(
+                    metarig_obj,
+                    bone_name,
+                    group_name,
+                    ui_row,
+                )
+            else:
+                assign_bone_to_layer_group(metarig_obj, bone_name, 27)
 
         # ------------------------------------------------------------
         # new_torso orientieren
@@ -1372,9 +1562,16 @@ class RigifyBauModus:
         rigify_obj.name = target_rig_name
         rigify_obj.data.name = f"{target_rig_name}_data"
 
+        rigify_extra_group_ui_rows = build_extra_group_ui_rows(rigify_obj.data)
+        extra_collection_names = apply_extra_group_collections(
+            rigify_obj,
+            rigify_extra_group_ui_rows,
+        )
+
         set_visible_rig_layers(
             rigify_obj,
             [0, 3, 6, 8, 11, 14, 17, 31],
+            extra_collection_names,
         )
 
         # ------------------------------------------------------------
@@ -1506,9 +1703,15 @@ class RigifyBauModus:
         if head_pose_bone is not None:
             head_pose_bone.custom_shape_scale_xyz = (1.5, 1.5, 1.5)
 
+        extra_collection_names = apply_extra_group_collections(
+            rigify_obj,
+            rigify_extra_group_ui_rows,
+        )
+
         set_visible_rig_layers(
             rigify_obj,
-            [0, 3, 6, 8, 11, 14, 17, 27, 13, 16, 7, 10, 5, 31],
+            [0, 3, 6, 8, 11, 14, 17, 13, 16, 7, 10, 5, 31],
+            extra_collection_names,
         )
 
         rigify_obj.data.pose_position = "POSE"
@@ -1731,3 +1934,26 @@ class RigifyBauModus:
             target_pose_bone.rotation_euler = (
                 source_pose_bone.rotation_euler.copy()
             )
+def ist_fk_control_bone(bone_name: str) -> bool:
+    name = bone_name.lower()
+
+    if bone_name.startswith(("DEF-", "MCH-", "ORG-")):
+        return False
+
+    return "_fk" in name or ".fk" in name or "-fk" in name
+
+
+def faerbe_fk_knochen_gruen(rig_obj) -> None:
+    if rig_obj is None or rig_obj.type != "ARMATURE":
+        return
+
+    rig_obj.data.show_bone_colors = True
+
+    for pose_bone in rig_obj.pose.bones:
+        if not ist_fk_control_bone(pose_bone.name):
+            continue
+
+        pose_bone.color.palette = "THEME09"
+        #   pose_bone.color.custom.normal = (0.15, 0.75, 0.20)
+        #   pose_bone.color.custom.select = (0.45, 1.00, 0.45)
+        #   pose_bone.color.custom.active = (0.75, 1.00, 0.75)
