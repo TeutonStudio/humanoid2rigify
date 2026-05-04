@@ -1,6 +1,6 @@
 from typing import Any
 
-from ...__methoden__ import get_current_bone_names
+from ...__methoden__ import get_current_bone_names, build_merge_extra_bone_groups
 from ..__operator__ import Operator
 from ...__eigenschaften__ import KNOCHEN
 from bpy.types import Context
@@ -40,22 +40,22 @@ def bone_item_list(self: Operator, context: Context) -> list[tuple[str, str, str
         for bone_name in bone_names
     ]
 
-def build_merge_extra_bone_groups(scene) -> list[dict]:
-    groups = []
-
-    for group in scene.merge_extra_bone_groups:
-        entries = [
-            item.value
-            for item in group.entries
-            if item.value
-        ]
-
-        if not entries:
-            continue
-
-        groups.append({
-            "name": group.name or "Additional",
-            "entries": entries,
-        })
-
-    return groups
+#   def build_merge_extra_bone_groups(scene) -> list[dict]:
+#       groups = []
+#
+#       for group in scene.merge_extra_bone_groups:
+#           entries = [
+#               item.value
+#               for item in group.entries
+#               if item.value
+#           ]
+#
+#           if not entries:
+#               continue
+#
+#           groups.append({
+#               "name": group.name or "Additional",
+#               "entries": entries,
+#           })
+#
+#       return groups

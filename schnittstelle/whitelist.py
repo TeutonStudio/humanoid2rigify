@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
-
-from bpy.types import Context, Object, Scene, UILayout
+from bpy.types import Context
 
 from .__methoden__ import draw_grouped_merge_whitelist
 from ..operatoren.__operator__ import Operatoren
 from ..__methoden__ import (
-    #   DEFAULT_MERGE_EXTRA_BONE_WHITELIST,
     get_current_armature,
     schedule_merge_whitelist_initialization,
 )
@@ -28,10 +24,20 @@ class MERGE_WHITELIST_panel(Panel):
         box.label(text="Knochen-Übernahme")
 
         schedule_merge_whitelist_initialization(scene)
-        box.label(text="Standardmuster und Bones des aktuellen Rigs")
 
-        if len(scene.merge_extra_bone_whitelist) == 0:
-            box.label(text="Keine Einträge vorhanden")
+        groups = getattr(scene, "merge_extra_bone_groups", None)
+
+        if groups is None:
+            row = box.row()
+            row.alert = True
+            row.label(
+                text="Property fehlt: merge_extra_bone_groups",
+                icon="ERROR",
+            )
+            return
+
+        if len(groups) == 0:
+            box.label(text="Keine Gruppen vorhanden", icon="INFO")
 
         draw_grouped_merge_whitelist(
             box,
@@ -41,6 +47,15 @@ class MERGE_WHITELIST_panel(Panel):
         )
 
         button_row = box.row(align=True)
-        button_row.operator(Operatoren.ADDIEREN, icon="ADD")
-        box.operator(Operatoren.STANDARDISIEREN, icon="FILE_REFRESH")
 
+        button_row.operator(
+            Operatoren.WHITELIST_GRUPPE_HINZUFUEGEN.value,
+            text="Gruppe hinzufügen",
+            icon="ADD",
+        )
+
+        #   box.operator(
+        #       Operatoren.WHITELIST_GRUPPE_STANDARDISIEREN.value,
+        #       text="Standardgruppen wiederherstellen",
+        #       icon="FILE_REFRESH",
+        #   )

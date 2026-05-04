@@ -1,6 +1,7 @@
 import bpy
 import json
 
+from .__methoden__ import load_merge_whitelist_groups_from_data
 from ...__methoden__ import get_mapping_folder
 from ..__operator__ import Operator, Operatoren
 
@@ -79,18 +80,19 @@ class MappingImportOperator(Operator):
         context.scene.heel_l = data["heel_l"]
         whitelist_values = data.get("merge_extra_bone_whitelist")
 
-        if isinstance(whitelist_values, list):
-            whitelist = context.scene.merge_extra_bone_whitelist
-
-            while len(whitelist) != 0:
-                whitelist.remove(len(whitelist) - 1)
-
-            for value in whitelist_values:
-                if not value:
-                    continue
-
-                item = whitelist.add()
-                item.value = str(value)
+        load_merge_whitelist_groups_from_data(context.scene, data)
+        #   if isinstance(whitelist_values, list):
+        #       whitelist = context.scene.merge_extra_bone_whitelist
+#
+        #       while len(whitelist) != 0:
+        #           whitelist.remove(len(whitelist) - 1)
+#
+        #       for value in whitelist_values:
+        #           if not value:
+        #               continue
+#
+        #           item = whitelist.add()
+        #           item.value = str(value)
 
         self.report({"INFO"}, f"{context.scene.presets} preset imported")
         return {"FINISHED"}

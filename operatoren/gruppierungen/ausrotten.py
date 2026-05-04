@@ -4,7 +4,7 @@ from ..__operator__ import Operatoren, Operator
 
 
 class OPR_remove_merge_whitelist_group(Operator):
-    bl_idname = Operatoren.WHITELIST_GRUPPE_LOESCHEN.value
+    bl_idname = Operatoren.WHITELIST_GRUPPE_LOESCHEN
     bl_label = "Whitelist-Gruppe löschen"
     bl_options = {"UNDO"}
 

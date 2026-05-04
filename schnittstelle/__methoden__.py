@@ -6,21 +6,25 @@ import os
 
 from bpy.types import Scene, Context, Object, UILayout
 
+from ..__methoden__ import DEFAULT_MERGE_EXTRA_BONE_WHITELIST
 from ..__eigenschaften__ import KnochenEnum, LRKnochenEnum, KEnum, Seite, Finger, Wirbelsäule, Arme, Beine
 from ..operatoren.__operator__ import Operatoren
 
 
 @dataclass(frozen=True)
 class WhitelistEintrag:
-    index: int
+    group_index: int
+    item_index: int
     item: Any
     value: str
 
 
 @dataclass(frozen=True)
 class WhitelistGruppe:
+    group_index: int
     key: str
     label: str
+    group: Any
     einträge: list[WhitelistEintrag]
 
 
@@ -467,17 +471,153 @@ def draw_grouped_merge_whitelist(
     scene: Scene,
     armature: Object | None,
 ) -> None:
-    gruppen = _baue_whitelist_gruppen(scene)
+    groups = getattr(scene, "merge_extra_bone_groups", None)
 
-    for gruppe in gruppen:
-        _draw_whitelist_group(
+    if groups is None:
+        draw_missing_scene_prop(layout, "merge_extra_bone_groups")
+        return
+
+    for group_index, group in enumerate(groups):
+        _draw_merge_whitelist_data_group(
             layout,
             context,
-            gruppe,
+            scene,
             armature,
+            group_index,
+            group,
             panel_prefix="merge_whitelist",
         )
 
+def _draw_merge_whitelist_data_group(
+    layout: UILayout,
+    context: Context,
+    scene: Scene,
+    armature: Object | None,
+    group_index: int,
+    group: Any,
+    panel_prefix: str,
+) -> None:
+    header, body = layout.panel(
+        f"{panel_prefix}_group_{group_index}",
+        default_closed=not bool(group.expanded),
+    )
+
+    header.prop(group, "name", text="", icon="GROUP_BONE")
+
+    remove_group_op = header.operator(
+        Operatoren.WHITELIST_GRUPPE_LOESCHEN.value,
+        text="",
+        icon="X",
+    )
+    remove_group_op.group_index = group_index
+
+    if body is None:
+        return
+
+    if len(group.entries) == 0:
+        body.label(text="Keine Einträge in dieser Gruppe", icon="INFO")
+
+    categorized_entries = _baue_whitelist_kategorie_gruppen(
+        scene,
+        group_index,
+        group,
+    )
+
+    for category in categorized_entries:
+        _draw_whitelist_category_group(
+            body,
+            context,
+            category,
+            armature,
+            panel_prefix=f"{panel_prefix}_group_{group_index}",
+        )
+
+    add_item_op = body.operator(
+        Operatoren.WHITELIST_EINTRAG_HINZUFUEGEN.value,
+        text="Eintrag hinzufügen",
+        icon="ADD",
+    )
+    add_item_op.group_index = group_index
+
+def _baue_whitelist_kategorie_gruppen(
+    scene: Scene,
+    group_index: int,
+    group: Any,
+) -> list[WhitelistGruppe]:
+    schemas = _baue_whitelist_gruppen_schemas()
+    sonstige_key = "sonstige"
+
+    gruppen: dict[str, WhitelistGruppe] = {
+        schema.key: WhitelistGruppe(
+            group_index=group_index,
+            key=schema.key,
+            label=schema.label,
+            group=group,
+            einträge=[],
+        )
+        for schema in schemas
+    }
+
+    gruppen[sonstige_key] = WhitelistGruppe(
+        group_index=group_index,
+        key=sonstige_key,
+        label="Sonstige",
+        group=group,
+        einträge=[],
+    )
+
+    for item_index, item in enumerate(group.entries):
+        value = item.value
+
+        schema = _finde_schema_für_wert(
+            scene,
+            schemas,
+            value,
+        )
+
+        key = schema.key if schema is not None else sonstige_key
+
+        gruppen[key].einträge.append(
+            WhitelistEintrag(
+                group_index=group_index,
+                item_index=item_index,
+                item=item,
+                value=value,
+            )
+        )
+
+    return [
+        gruppe
+        for gruppe in gruppen.values()
+        if gruppe.einträge
+    ]
+
+def _draw_whitelist_category_group(
+    layout: UILayout,
+    context: Context,
+    gruppe: WhitelistGruppe,
+    armature: Object | None,
+    panel_prefix: str,
+) -> None:
+    body = draw_foldout(
+        layout,
+        f"{panel_prefix}_{gruppe.key}",
+        gruppe.label,
+        icon="BONE_DATA",
+        default_closed=True,
+    )
+
+    if body is None:
+        return
+
+    for eintrag in gruppe.einträge:
+        _draw_whitelist_item_row(
+            body,
+            armature,
+            eintrag.group_index,
+            eintrag.item_index,
+            eintrag.item,
+        )
 
 def _draw_whitelist_group(
     layout: UILayout,

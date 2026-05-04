@@ -2,13 +2,14 @@ from typing import Type
 
 import bpy
 
-from . import übernahme, übernahme, zuordnung, werkzeuge
+from . import übernahme, übernahme, zuordnung, werkzeuge, gruppierungen
 from .__operator__ import Operator
 
 _MODULES: list = [
     übernahme,
     zuordnung,
     werkzeuge,
+    gruppierungen,
 ]
 
 def register():

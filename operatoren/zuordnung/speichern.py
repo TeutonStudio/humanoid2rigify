@@ -1,6 +1,7 @@
 import bpy
 import json
 
+from ...__methoden__ import get_mapping_folder, build_merge_extra_bone_groups
 from ...__methoden__ import get_mapping_folder
 from ..__operator__ import Operator, Operatoren
 
@@ -10,6 +11,7 @@ class MappingSaveOperator(Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
+        merge_groups = build_merge_extra_bone_groups(context.scene)
         prop_dict = {
             "head": context.scene.head,
             "first_neck": context.scene.first_neck,
@@ -72,12 +74,13 @@ class MappingSaveOperator(Operator):
             "toe_r": context.scene.toe_r,
             "heel_r": context.scene.heel_r,
             "heel_l": context.scene.heel_l,
+            "merge_extra_bone_groups": merge_groups,
 
-            "merge_extra_bone_whitelist": [
-                item.value
-                for item in context.scene.merge_extra_bone_whitelist
-                if item.value
-            ],
+#               "merge_extra_bone_whitelist": [
+#                   item.value
+#                   for item in context.scene.merge_extra_bone_whitelist
+#                   if item.value
+#               ],
         }
 
         # ===========================================================

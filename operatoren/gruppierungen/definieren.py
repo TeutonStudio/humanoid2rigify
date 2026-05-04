@@ -2,7 +2,7 @@ from ..__operator__ import Operatoren, Operator
 
 
 class OPR_add_merge_whitelist_group(Operator):
-    bl_idname = Operatoren.WHITELIST_GRUPPE_HINZUFUEGEN.value
+    bl_idname = Operatoren.WHITELIST_GRUPPE_HINZUFUEGEN
     bl_label = "Whitelist-Gruppe hinzufügen"
     bl_options = {"UNDO"}
 

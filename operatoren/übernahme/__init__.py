@@ -7,8 +7,10 @@ from typing import Type
 _OPERATOREN: list[Type[Operator]] = [
     auswählen.OPR_pick_merge_whitelist_bone,
     erweitern.OPR_add_merge_whitelist_item,
+    erweitern.OPR_add_merge_whitelist_group,
     verbieten.OPR_remove_merge_whitelist_item,
-    standardisieren.OPR_reset_merge_whitelist,
+    verbieten.OPR_remove_merge_whitelist_group,
+    #   standardisieren.OPR_reset_merge_whitelist,
 ]
 
 def register():

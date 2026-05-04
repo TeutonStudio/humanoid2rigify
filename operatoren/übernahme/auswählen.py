@@ -6,7 +6,7 @@ from ..__operator__ import Operator, Operatoren
 
 
 class OPR_pick_merge_whitelist_bone(Operator):
-    bl_idname = Operatoren.WHITELIST_KNOCHEN_AUSWAEHLEN.value
+    bl_idname = Operatoren.WHITELIST_KNOCHEN_AUSWAEHLEN
     bl_label = "Whitelist-Knochen wählen"
     bl_property = "selected_bone"
 
