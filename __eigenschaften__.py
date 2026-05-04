@@ -33,6 +33,46 @@ CLASSES = [
     # CachedBoneNameItem,
 ]
 
+from schnittstelle.__methoden__ import my_settings_callback
+
+
+class MergeWhitelistItem(bpy.types.PropertyGroup):
+    value: StringProperty(name="Value", default="")
+
+#   class CachedBoneNameItem(bpy.types.PropertyGroup):
+#       name: StringProperty(name="Bone")
+
+from . import __methoden__ as root_methoden
+
+
+def unregister():
+    #   root_methoden._MERGE_WHITELIST_INIT_SCENE = None
+    #   root_methoden._BONE_NAME_CACHE_INIT_SCENE = None
+    #   root_methoden._BONE_NAME_CACHE_INIT_ARMATURE = None
+    #   root_methoden._BONE_NAME_CACHE.clear()
+    #   if bpy.app.timers.is_registered(root_methoden.initialize_pending_bone_name_cache):
+    #       bpy.app.timers.unregister(root_methoden.initialize_pending_bone_name_cache)
+    #   if bpy.app.timers.is_registered(root_methoden.initialize_pending_merge_whitelist):
+    #       bpy.app.timers.unregister(root_methoden.initialize_pending_merge_whitelist)
+    for (prop_name, _) in PROPS:
+        delattr(bpy.types.Scene, prop_name)
+    for cls in reversed(CLASSES):
+        bpy.utils.unregister_class(cls)
+
+
+def register():
+    #   root_methoden._BONE_NAME_CACHE.clear()
+    for cls in CLASSES:
+        bpy.utils.register_class(cls)
+    for (prop_name, prop_value) in PROPS:
+        setattr(bpy.types.Scene, prop_name, prop_value)
+
+
+CLASSES = [
+    MergeWhitelistItem,
+    # CachedBoneNameItem,
+]
+
 
 def _liste_seite(liste:Callable[[str],Iterator[str]]) -> Iterator[str]:
     for seite in Seite: yield from liste(seite.value)
