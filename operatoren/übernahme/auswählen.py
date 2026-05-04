@@ -1,12 +1,11 @@
 import bpy
 
 from ..werkzeuge.__methoden__ import bone_item_list
-from ...__methoden__ import get_current_armature, get_current_bone_names
 from ..__operator__ import Operator, Operatoren
 
 
 class OPR_pick_merge_whitelist_bone(Operator):
-    bl_idname = Operatoren.WHITELIST_KNOCHEN_AUSWAEHLEN
+    bl_idname = Operatoren.WHITELIST_KNOCHEN_AUSWAEHLEN.value
     bl_label = "Whitelist-Knochen wählen"
     bl_property = "selected_bone"
 
@@ -32,9 +31,16 @@ class OPR_pick_merge_whitelist_bone(Operator):
         current_value = group.entries[self.item_index].value
 
         if current_value:
-            self.selected_bone = current_value
+            valid_values = {
+                item[0]
+                for item in bone_item_list(self, context)
+            }
 
-        return context.window_manager.invoke_search_popup(self)
+            if current_value in valid_values:
+                self.selected_bone = current_value
+
+        context.window_manager.invoke_search_popup(self)
+        return {"FINISHED"}
 
     def execute(self, context):
         groups = context.scene.merge_extra_bone_groups

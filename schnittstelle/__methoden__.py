@@ -478,31 +478,40 @@ def draw_grouped_merge_whitelist(
         return
 
     for group_index, group in enumerate(groups):
-        _draw_merge_whitelist_data_group(
-            layout,
-            context,
-            scene,
-            armature,
-            group_index,
-            group,
+        _draw_merge_whitelist_group(
+            layout=layout,
+            armature=armature,
+            group_index=group_index,
+            group=group,
             panel_prefix="merge_whitelist",
         )
 
-def _draw_merge_whitelist_data_group(
+
+def _draw_merge_whitelist_group(
     layout: UILayout,
-    context: Context,
-    scene: Scene,
     armature: Object | None,
     group_index: int,
     group: Any,
     panel_prefix: str,
 ) -> None:
-    header, body = layout.panel(
-        f"{panel_prefix}_group_{group_index}",
-        default_closed=not bool(group.expanded),
+    panel_id = _merge_whitelist_group_panel_id(
+        group=group,
+        group_index=group_index,
+        panel_prefix=panel_prefix,
     )
 
-    header.prop(group, "name", text="", icon="GROUP_BONE")
+    header, body = layout.panel(
+        panel_id,
+        default_closed=not bool(getattr(group, "expanded", True)),
+    )
+
+    header.prop(
+        group,
+        "name",
+        text="",
+        icon="GROUP_BONE",
+        translate=False,
+    )
 
     remove_group_op = header.operator(
         Operatoren.WHITELIST_GRUPPE_LOESCHEN.value,
@@ -515,141 +524,49 @@ def _draw_merge_whitelist_data_group(
         return
 
     if len(group.entries) == 0:
-        body.label(text="Keine Einträge in dieser Gruppe", icon="INFO")
-
-    categorized_entries = _baue_whitelist_kategorie_gruppen(
-        scene,
-        group_index,
-        group,
-    )
-
-    for category in categorized_entries:
-        _draw_whitelist_category_group(
-            body,
-            context,
-            category,
-            armature,
-            panel_prefix=f"{panel_prefix}_group_{group_index}",
+        body.label(
+            text="Keine Knochen in dieser Gruppe",
+            icon="INFO",
         )
+
+    for item_index, item in enumerate(group.entries):
+        _draw_merge_whitelist_item_row(
+            layout=body,
+            armature=armature,
+            group_index=group_index,
+            item_index=item_index,
+            item=item,
+        )
+
+    body.separator()
 
     add_item_op = body.operator(
         Operatoren.WHITELIST_EINTRAG_HINZUFUEGEN.value,
-        text="Eintrag hinzufügen",
+        text="Neuer Knochen",
         icon="ADD",
     )
     add_item_op.group_index = group_index
 
-def _baue_whitelist_kategorie_gruppen(
-    scene: Scene,
-    group_index: int,
+
+def _merge_whitelist_group_panel_id(
     group: Any,
-) -> list[WhitelistGruppe]:
-    schemas = _baue_whitelist_gruppen_schemas()
-    sonstige_key = "sonstige"
-
-    gruppen: dict[str, WhitelistGruppe] = {
-        schema.key: WhitelistGruppe(
-            group_index=group_index,
-            key=schema.key,
-            label=schema.label,
-            group=group,
-            einträge=[],
-        )
-        for schema in schemas
-    }
-
-    gruppen[sonstige_key] = WhitelistGruppe(
-        group_index=group_index,
-        key=sonstige_key,
-        label="Sonstige",
-        group=group,
-        einträge=[],
-    )
-
-    for item_index, item in enumerate(group.entries):
-        value = item.value
-
-        schema = _finde_schema_für_wert(
-            scene,
-            schemas,
-            value,
-        )
-
-        key = schema.key if schema is not None else sonstige_key
-
-        gruppen[key].einträge.append(
-            WhitelistEintrag(
-                group_index=group_index,
-                item_index=item_index,
-                item=item,
-                value=value,
-            )
-        )
-
-    return [
-        gruppe
-        for gruppe in gruppen.values()
-        if gruppe.einträge
-    ]
-
-def _draw_whitelist_category_group(
-    layout: UILayout,
-    context: Context,
-    gruppe: WhitelistGruppe,
-    armature: Object | None,
+    group_index: int,
     panel_prefix: str,
-) -> None:
-    body = draw_foldout(
-        layout,
-        f"{panel_prefix}_{gruppe.key}",
-        gruppe.label,
-        icon="BONE_DATA",
-        default_closed=True,
-    )
+) -> str:
+    uid = getattr(group, "uid", "")
 
-    if body is None:
-        return
+    if uid:
+        uid = uid.replace("-", "_")
+        return f"{panel_prefix}_group_{uid}"
 
-    for eintrag in gruppe.einträge:
-        _draw_whitelist_item_row(
-            body,
-            armature,
-            eintrag.group_index,
-            eintrag.item_index,
-            eintrag.item,
-        )
-
-def _draw_whitelist_group(
-    layout: UILayout,
-    context: Context,
-    gruppe: WhitelistGruppe,
-    armature: Object | None,
-    panel_prefix: str,
-) -> None:
-    body = draw_foldout(
-        layout,
-        f"{panel_prefix}_{gruppe.key}",
-        gruppe.label,
-        icon="BONE_DATA",
-        default_closed=True,
-    )
-
-    if body is None:
-        return
-
-    for eintrag in gruppe.einträge:
-        _draw_whitelist_item_row(
-            body,
-            armature,
-            eintrag.index,
-            eintrag.item,
-        )
+    return f"{panel_prefix}_group_{group_index}"
 
 
-def _draw_whitelist_item_row(
+def _draw_merge_whitelist_item_row(
     layout: UILayout,
     armature: Object | None,
-    index: int,
+    group_index: int,
+    item_index: int,
     item: Any,
 ) -> None:
     item_row = layout.row(align=True)
@@ -657,70 +574,28 @@ def _draw_whitelist_item_row(
     item_row.prop(
         item,
         "value",
-        text=f"{index + 1}",
+        text=f"{item_index + 1}",
     )
 
     pick_button = item_row.row(align=True)
     pick_button.enabled = armature is not None
 
     pick_op = pick_button.operator(
-        Operatoren.AUSWÄHLEN,
+        Operatoren.WHITELIST_KNOCHEN_AUSWAEHLEN.value,
         text="",
         icon="BONE_DATA",
     )
-    pick_op.item_index = index
+    pick_op.group_index = group_index
+    pick_op.item_index = item_index
 
     remove_op = item_row.operator(
-        Operatoren.VERBIETEN,
+        Operatoren.WHITELIST_EINTRAG_LOESCHEN.value,
         text="",
         icon="X",
     )
-    remove_op.item_index = index
+    remove_op.group_index = group_index
+    remove_op.item_index = item_index
 
-
-def _baue_whitelist_gruppen(scene: Scene) -> list[WhitelistGruppe]:
-    schemas = _baue_whitelist_gruppen_schemas()
-    sonstige_key = "sonstige"
-
-    gruppen: dict[str, WhitelistGruppe] = {
-        schema.key: WhitelistGruppe(
-            key=schema.key,
-            label=schema.label,
-            einträge=[],
-        )
-        for schema in schemas
-    }
-
-    gruppen[sonstige_key] = WhitelistGruppe(
-        key=sonstige_key,
-        label="Sonstige",
-        einträge=[],
-    )
-
-    for index, item in enumerate(scene.merge_extra_bone_whitelist):
-        value = item.value
-
-        schema = _finde_schema_für_wert(
-            scene,
-            schemas,
-            value,
-        )
-
-        key = schema.key if schema is not None else sonstige_key
-
-        gruppen[key].einträge.append(
-            WhitelistEintrag(
-                index=index,
-                item=item,
-                value=value,
-            )
-        )
-
-    return [
-        gruppe
-        for gruppe in gruppen.values()
-        if gruppe.einträge
-    ]
 
 
 def _finde_schema_für_wert(

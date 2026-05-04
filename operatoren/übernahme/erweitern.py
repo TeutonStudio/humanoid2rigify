@@ -1,4 +1,5 @@
 import bpy
+import uuid
 
 from ...__methoden__ import get_next_merge_whitelist_value
 from ..__operator__ import Operator, Operatoren
@@ -13,6 +14,7 @@ class OPR_add_merge_whitelist_group(Operator):
         groups = context.scene.merge_extra_bone_groups
 
         group = groups.add()
+        group.uid = uuid.uuid4().hex
         group.name = "Neue Gruppe"
         group.expanded = True
         group.active_index = -1
@@ -36,6 +38,7 @@ class OPR_add_merge_whitelist_item(Operator):
             return {"CANCELLED"}
 
         group = groups[self.group_index]
+
         item = group.entries.add()
         item.value = get_next_merge_whitelist_value(context.scene, context)
 
