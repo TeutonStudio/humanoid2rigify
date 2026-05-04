@@ -8,6 +8,8 @@ def _liste_seite(liste) -> list[str]:
 
 SEITE = ["r","l"]
 
+WURZEL = "root"
+
 WIRBEL = [
     "first_spine",
     "last_spine",
