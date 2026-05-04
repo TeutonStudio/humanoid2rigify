@@ -1,11 +1,11 @@
 import bpy
 
 from ...__methoden__ import ensure_merge_whitelist, DEFAULT_MERGE_EXTRA_BONE_WHITELIST
-from ..__operator__ import Operator
+from ..__operator__ import Operator, Operatoren
 
 
 class OPR_reset_merge_whitelist(Operator):
-    bl_idname = "opr.reset_merge_whitelist"
+    bl_idname = Operatoren.STANDARDISIEREN
     bl_label = "Whitelist zurücksetzen"
 
     def execute(self, context):

@@ -1,11 +1,11 @@
 import bpy
 
-from __eigenschaften__ import BEINE
+from ...__eigenschaften__ import BEINE
+from ..__panel__ import Panel, Panele
 from .__methoden__ import draw_bone_prop_with_status, draw_bone_prop_with_status_per_side
-from ..__panel__ import Panel
 
 class LEGS_panel(Panel):
-    bl_idname = "LEGS_PT_panel"
+    bl_idname = Panele.BEINE
     bl_label = "Legs"
     # bl_options = {"DEFAULT_CLOSED"}
 

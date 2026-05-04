@@ -1,11 +1,11 @@
 import bpy
 
 from ...__methoden__ import ensure_merge_whitelist
-from ..__operator__ import Operator
+from ..__operator__ import Operator, Operatoren
 
 
 class OPR_remove_merge_whitelist_item(Operator):
-    bl_idname = "opr.remove_merge_whitelist_item"
+    bl_idname = Operatoren.VERBIETEN
     bl_label = "Whitelist-Eintrag entfernen"
 
     item_index: bpy.props.IntProperty(default=-1)

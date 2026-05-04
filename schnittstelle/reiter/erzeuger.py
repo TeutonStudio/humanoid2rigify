@@ -1,17 +1,14 @@
 import bpy
 
-from ...__methoden__ import is_pose_armature_context
-from ..__panel__ import Panel
+from ...operatoren.__operator__ import Operatoren
+from ..__panel__ import Panel, Panele
 
 
 class GENERATE_panel(Panel):
-    bl_idname = "GENERATE_PT_panel"
+    bl_idname = Panele.ERZEUGUNG
     bl_label = "Generate"
     # bl_options = {"DEFAULT_OPENED"}
 
-    @classmethod
-    def poll(cls, context):
-        return is_pose_armature_context(context)
 
     def draw(self, context):
         layout = self.layout
@@ -19,5 +16,5 @@ class GENERATE_panel(Panel):
         box = self.layout.box()
         box.label(text="Generate")
         box.prop(scn, "generation_mode")
-        box.operator("opr.object_operator", text="Generate Rigify")
+        box.operator(Operatoren.ERZEUGUNG, text="Generate Rigify")
         box.prop(scn, "copy_loc_constr")

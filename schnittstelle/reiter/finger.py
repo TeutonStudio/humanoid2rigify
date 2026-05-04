@@ -1,11 +1,11 @@
 import bpy
 
-from __eigenschaften__ import FINGER
+from ...__eigenschaften__ import FINGER
+from ..__panel__ import Panel, Panele
 from .__methoden__ import draw_bone_prop_with_status, draw_bone_prop_with_status_per_side
-from ..__panel__ import Panel
 
 class FINGERS_panel(Panel):
-    bl_idname = "FINGERS_PT_panel"
+    bl_idname = Panele.FINGER
     bl_label = "Fingers"
     # bl_options = {"DEFAULT_CLOSED"}
 

@@ -9,7 +9,6 @@ def collect_bone_ancestors(armature_obj, bone_names):
 
     return ancestors
 
-
 def collect_constraint_subtargets(armature_obj, bone_names):
     subtargets = set()
 
@@ -27,7 +26,6 @@ def collect_constraint_subtargets(armature_obj, bone_names):
                 subtargets.add(subtarget)
 
     return subtargets
-
 
 def compute_deform_mode_keep_bones(context):
     weighted_deform_bones = set(context.used_deform_bones)

@@ -1,13 +1,13 @@
 import bpy
 
-from . import auswählen, erweitern, vernichten, standardisieren
+from . import auswählen, erweitern, verbieten, standardisieren
 from ..__operator__ import Operator
 from typing import Type
 
 _OPERATOREN: list[Type[Operator]] = [
     auswählen.OPR_pick_merge_whitelist_bone,
     erweitern.OPR_add_merge_whitelist_item,
-    vernichten.OPR_remove_merge_whitelist_item,
+    verbieten.OPR_remove_merge_whitelist_item,
     standardisieren.OPR_reset_merge_whitelist,
 ]
 

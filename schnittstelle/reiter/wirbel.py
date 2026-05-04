@@ -1,12 +1,12 @@
 import bpy
 
-from __eigenschaften__ import WIRBEL
+from ...__eigenschaften__ import WIRBEL
+from ..__panel__ import Panel, Panele
 from .__methoden__ import draw_bone_prop_with_status
-from ..__panel__ import Panel
 
 
 class SPINES_panel(Panel):
-    bl_idname = "SPINES_PT_panel"
+    bl_idname = Panele.WIRBEL
     bl_label = "Spines"
     # bl_options = {"DEFAULT_CLOSED"}
 

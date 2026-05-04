@@ -1,19 +1,19 @@
 import bpy
 
-from __eigenschaften__ import KNOCHEN
-from __methoden__ import ensure_merge_whitelist
-from operatoren.__methoden__ import generate_rig
-from operatoren.__operator__ import Operator
+from .__methoden__ import build_params
+from ...__methoden__ import ensure_merge_whitelist
+from ..__methoden__ import generate_rig
+from ..__operator__ import Operator, Operatoren
 
 
 class ObjectOperator(Operator):
-    bl_idname = "opr.object_operator"
+    bl_idname = Operatoren.ERZEUGUNG
     bl_label = "Any Rig to Rigify"
     bl_options = {"UNDO"}
 
     def execute(self, context):
         ensure_merge_whitelist(context.scene)
-        params = [(str(wert), getattr(context.scene,wert)) for wert in KNOCHEN]
+        params = build_params(context.scene)
 
         objects = bpy.context.selected_objects
         generate_rig(self, objects, params)

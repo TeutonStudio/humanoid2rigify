@@ -2,12 +2,12 @@ import os
 
 import bpy
 
-from operatoren.__operator__ import Operator
-from __methoden__ import get_mapping_folder
+from ...__methoden__ import get_mapping_folder
+from ..__operator__ import Operator, Operatoren
 
 
 class MappingRenameOperator(Operator):
-    bl_idname = "opr.mapping_rename_operator"
+    bl_idname = Operatoren.UMBENNENEN
     bl_label = "mapping_templates_rename"
     bl_options = {"REGISTER", "UNDO"}
 

@@ -1,11 +1,11 @@
 import bpy
 
-from __eigenschaften__ import ARME
+from ...__eigenschaften__ import ARME
+from ..__panel__ import Panel, Panele
 from .__methoden__ import draw_bone_prop_with_status, draw_bone_prop_with_status_per_side
-from ..__panel__ import Panel
 
 class ARMS_panel(Panel):
-    bl_idname = "ARMS_PT_panel"
+    bl_idname = Panele.ARME
     bl_label = "Arms"
     # bl_options = {"DEFAULT_CLOSED"}
 

@@ -1,12 +1,11 @@
 import bpy
 
-
 bl_info = {
     "name": "Any Rig to Rigify",
-    "author": "demania",
+    "author": "TeutonStudio",
     "description": "Convert arbitrary armatures to Rigify with Blender 4.x/5.x compatibility.",
-    "blender": (4, 0, 0),
-    "version": (0, 1, 0),
+    "blender": (5, 1, 0),
+    "version": (0, 3, 0),
     "location": "View3D",
     "warning": "",
     "category": "Object",

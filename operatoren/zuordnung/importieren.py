@@ -1,11 +1,11 @@
 import bpy
 import json
 
-from operatoren.__operator__ import Operator
-from __methoden__ import get_mapping_folder
+from ...__methoden__ import get_mapping_folder
+from ..__operator__ import Operator, Operatoren
 
 class MappingImportOperator(Operator):
-    bl_idname = "opr.mapping_import_operator"
+    bl_idname = Operatoren.IMPORTIEREN
     bl_label = "mapping_templates_import"
     bl_options = {"REGISTER", "UNDO"}
 

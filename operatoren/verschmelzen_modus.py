@@ -132,14 +132,14 @@ def run_merge_mode(context):
     if not context.bound_meshes:
         context.operator.report(
             {"ERROR"},
-            "Keine Meshes mit Armature-Modifier fuer das Quellrig gefunden",
+            "Keine Meshes mit Armature-Modifier für das Quellrig gefunden",
         )
         return False
 
     if not context.used_deform_bones:
         context.operator.report(
             {"ERROR"},
-            "Keine tatsaechlich benutzten Deformationsknochen gefunden",
+            "Keine tatsächlich benutzten Deformationsknochen gefunden",
         )
         return False
 
@@ -180,10 +180,10 @@ def run_merge_mode(context):
         (
             f"Backup erstellt: {context.backup_collection.name}. "
             f"Verschmolzen, {len(ensured_targets)} Zielknochen gesichert, "
-            f"{copied_shapes} Custom Shapes uebernommen oder ersetzt, "
+            f"{copied_shapes} Custom Shapes übernommen oder ersetzt, "
             f"{migrated_groups} Vertex-Groups migriert, "
             f"{rebound_meshes} Meshes umgehaengt, "
-            f"{len(skipped_merge_bones)} Extra-Bones nicht uebertragen."
+            f"{len(skipped_merge_bones)} Extra-Bones nicht übertragen."
         ),
     )
     return True

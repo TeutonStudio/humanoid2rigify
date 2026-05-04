@@ -1,12 +1,11 @@
 import bpy
 import os
 
-from operatoren.__operator__ import Operator
-from __methoden__ import get_mapping_folder
+from ...__methoden__ import get_mapping_folder
+from ..__operator__ import Operator, Operatoren
 
 class MappingDeleteOperator(Operator):
-
-    bl_idname = "opr.mapping_delete_operator"
+    bl_idname = Operatoren.VERNICHTEN
     bl_label = "mapping_templates_delete"
     bl_options = {"REGISTER", "UNDO"}
 

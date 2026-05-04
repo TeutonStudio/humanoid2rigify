@@ -1,11 +1,11 @@
 import bpy
 import json
 
-from operatoren.__operator__ import Operator
-from __methoden__ import get_mapping_folder
+from ...__methoden__ import get_mapping_folder
+from ..__operator__ import Operator, Operatoren
 
 class MappingSaveOperator(Operator):
-    bl_idname = "opr.mapping_save_operator"
+    bl_idname = Operatoren.SPEICHERN
     bl_label = "mapping_templates"
     bl_options = {"REGISTER", "UNDO"}
 

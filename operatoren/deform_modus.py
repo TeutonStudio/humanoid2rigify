@@ -39,14 +39,14 @@ def run_deform_mode(context):
     if not context.bound_meshes:
         context.operator.report(
             {"ERROR"},
-            "Keine Meshes mit Armature-Modifier fuer das Quellrig gefunden",
+            "Keine Meshes mit Armature-Modifier für das Quellrig gefunden",
         )
         return False
 
     if not context.used_deform_bones:
         context.operator.report(
             {"ERROR"},
-            "Keine tatsaechlich benutzten Deformationsknochen gefunden",
+            "Keine tatsächlich benutzten Deformationsknochen gefunden",
         )
         return False
 
@@ -79,7 +79,7 @@ def run_deform_mode(context):
         (
             f"Backup erstellt: {context.backup_collection.name}. "
             f"Deformationsrig reduziert, {len(removed_bones)} Knochen entfernt. "
-            f"{copied_shapes} Custom Shapes uebernommen oder ersetzt."
+            f"{copied_shapes} Custom Shapes übernommen oder ersetzt."
         ),
     )
     return True

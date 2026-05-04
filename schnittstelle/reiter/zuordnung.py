@@ -1,10 +1,11 @@
 import bpy
 
-from ..__panel__ import Panel
+from ...operatoren.__operator__ import Operatoren
+from ..__panel__ import Panel, Panele
 
 
 class MAPPING_panel(Panel):
-    bl_idname = "MAPPING_PT_panel"
+    bl_idname = Panele.ZUORDNUNG
     bl_label = "Mapping"
     # bl_options = {"DEFAULT_CLOSED"}
 
@@ -22,19 +23,18 @@ class MAPPING_panel(Panel):
         box.label(text="save mapping")
 
         box.prop(scn, "json_file_name")
-        box.operator("opr.mapping_save_operator", text="save mapping")
+        box.operator(Operatoren.SPEICHERN, text="save mapping")
 
         box = layout.box()
         box.label(text="import presets")
         box.prop(scn, "presets")
-        box.operator("opr.mapping_import_operator", text="import mapping")
+        box.operator(Operatoren.IMPORTIEREN, text="import mapping")
 
         box = layout.box()
         box.label(text="delete active preset")
-        box.operator("opr.mapping_delete_operator",
-                     text=f"delete {scn.presets}")
+        box.operator(Operatoren.VERNICHTEN, text=f"delete {scn.presets}")
 
         box = layout.box()
         box.label(text="rename active reset")
         box.prop(scn, "rename_preset")
-        box.operator("opr.mapping_rename_operator", text="rename preset")
+        box.operator(Operatoren.UMBENNENEN, text="rename preset")
