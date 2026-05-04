@@ -1,11 +1,9 @@
-from typing import Type
-
 import bpy
 
 from .__panel__ import Panel
 from . import zuordnung, definition, erzeuger, whitelist
 
-_PANELE: list[Type[Panel]] = [
+_PANELE: list[type[Panel]] = [
     erzeuger.GENERATE_panel,
     zuordnung.MAPPING_panel,
     definition.DEFINITION_panel,

@@ -1,6 +1,6 @@
 from fnmatch import fnmatchcase
 
-from __methoden__ import DEFAULT_MERGE_EXTRA_BONE_WHITELIST
+from ...__methoden__ import DEFAULT_MERGE_EXTRA_BONE_WHITELIST
 
 PARAM_BONE_KEYS = [
     "head",

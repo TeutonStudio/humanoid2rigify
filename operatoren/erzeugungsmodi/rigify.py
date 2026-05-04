@@ -1,5 +1,5 @@
-from __eigenschaften__ import Wirbelsäule
-from operatoren.erzeugungsmodi.__methoden__ import get_generated_rigify_object
+from ...__eigenschaften__ import Wirbelsäule
+from ...operatoren.erzeugungsmodi.__methoden__ import get_generated_rigify_object
 
 GENERIC_CIRCLE_WIDGET_VERTEX_COUNT = 32
 

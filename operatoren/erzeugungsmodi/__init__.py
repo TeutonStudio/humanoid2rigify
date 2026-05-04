@@ -1,19 +1,17 @@
 from __future__ import annotations
-
-from collections.abc import Sequence
-
 import bpy
 from bpy.types import Object
 
-from .__methoden__ import get_generation_blocker_message, create_generation_context
+from ...operatoren.erzeugungsmodi.backup import create_backups
 from ...__eigenschaften__ import ErzeugungsModus
 
-from operatoren.erzeugungsmodi.backup import create_backups
 
+from .__methoden__ import get_generation_blocker_message, create_generation_context
 from .deformieren import DeformRigErhalter
 from .erhalten import OriginalErhalter
 from .verschmelzen import RigVerschmelzer
 
+from collections.abc import Sequence
 
 class RigifyBauer:
     def __init__(

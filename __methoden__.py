@@ -1,3 +1,4 @@
+import os
 from typing import Any, Sequence
 
 import bpy
@@ -150,3 +151,22 @@ def tag_redraw_all_areas():
             continue
         for area in screen.areas:
             area.tag_redraw()
+
+def my_settings_callback(scene: Scene, context: Context) -> list[tuple]:
+    # get to mapping_templates folder or create if there isn't one
+    mapping_folder = get_mapping_folder()
+
+    json_presets = []
+    files = sorted(os.listdir(mapping_folder))
+    # get only json files
+    for file in files:
+        _, file_extension = os.path.splitext(file)
+        if file_extension == ".json":
+            json_presets.append(file)
+
+    items = []
+    for i in json_presets:
+        s = (i, i, "")
+        items.append(s)
+
+    return items
