@@ -1,7 +1,7 @@
 import bpy
 
-from ...operatoren.__operator__ import Operatoren
-from ..__panel__ import Panel, Panele
+from ..operatoren.__operator__ import Operatoren
+from .__panel__ import Panel, Panele
 
 
 class GENERATE_panel(Panel):

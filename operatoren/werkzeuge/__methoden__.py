@@ -6,7 +6,7 @@ from ...__eigenschaften__ import KNOCHEN
 from bpy.types import Context
 
 
-def build_params(scene) -> dict:
+def build_params(scene) -> dict[str,str | list[str]]:
     params = {
         str(name): getattr(scene, name)
         for name in KNOCHEN
