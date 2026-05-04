@@ -3,18 +3,13 @@ from typing import Type
 import bpy
 
 from ..__panel__ import Panel
-from . import erzeuger, zuordnung, whitelist, definition # finger, torso, wirbel, arme, beine,
+from . import erzeuger, zuordnung, whitelist, definition
 
 _PANELE: list[Type[Panel]] = [
     erzeuger.GENERATE_panel,
-    whitelist.MERGE_WHITELIST_panel,
     zuordnung.MAPPING_panel,
-    #   torso.UPPER_BODY_panel,
-    #   wirbel.SPINES_panel,
-    #   arme.ARMS_panel,
-    #   finger.FINGERS_panel,
-    #   beine.LEGS_panel,
     definition.DEFINITION_panel,
+    whitelist.MERGE_WHITELIST_panel,
 ]
 
 def register():

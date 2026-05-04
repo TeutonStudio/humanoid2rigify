@@ -1,7 +1,8 @@
-from ...operatoren.__operator__ import Operatoren
-from ...__eigenschaften__ import TORSO, WIRBEL, ARME, BEINE, FINGER, WURZEL
+import bpy
+
+from ...__eigenschaften__ import Finger, Beine, Arme, Wirbelsäule
 from ..__panel__ import Panel, Panele
-from .__methoden__ import draw_bone_prop_with_status_per_side, draw_finger_bone_props_grouped, draw_bone_prop_group, draw_single_bone_prop
+from .__methoden__ import draw_bone_prop_group, draw_single_bone_prop, draw_finger_bone_props_grouped_foldouts, draw_foldout, draw_bone_props_per_side_foldouts
 
 
 class DEFINITION_panel(Panel):
@@ -11,89 +12,107 @@ class DEFINITION_panel(Panel):
 
     def draw(self, context):
         layout = self.layout
-        scn = context.scene
 
-        # Wurzel
-        header, body = layout.panel(
-            "definition_root",
-            default_closed=False,
-        )
-        header.label(text="Wurzel", icon="BONE_DATA")
+#        # Wurzel
+#        body = draw_foldout(
+#            layout,
+#            "definition_root",
+#            "Wurzel",
+#            icon="BONE_DATA",
+#            default_closed=False,
+#        )
+#
+#        if body:
+#            draw_single_bone_prop(
+#                body,
+#                context,
+#                WURZEL,
+#            )
 
-        if body:
-            draw_single_bone_prop(
-                body,
-                context,
-                WURZEL,
-            )
-
-        # Torso
-        header, body = layout.panel(
-            "definition_upper_body",
-            default_closed=False,
-        )
-        header.label(text="Torso", icon="BONE_DATA")
-
-        if body:
-            draw_bone_prop_group(
-                body,
-                context,
-                TORSO,
-            )
+#        # Torso
+#        body = draw_foldout(
+#            layout,
+#            "definition_torso",
+#            "Torso",
+#            icon="BONE_DATA",
+#            default_closed=False,
+#        )
+#
+#        if body:
+#            draw_bone_prop_group(
+#                body,
+#                context,
+#                TORSO,
+#            )
 
         # Wirbelsäule
-        header, body = layout.panel(
+        body = draw_foldout(
+            layout,
             "definition_spines",
+            "Wirbelsäule",
+            icon="BONE_DATA",
             default_closed=False,
         )
-        header.label(text="Wirbelsäule", icon="BONE_DATA")
 
         if body:
             draw_bone_prop_group(
                 body,
                 context,
-                WIRBEL,
+                Wirbelsäule,
             )
 
         # Arme
-        header, body = layout.panel(
+        body = draw_foldout(
+            layout,
             "definition_arms",
+            "Arme",
+            icon="BONE_DATA",
             default_closed=True,
         )
-        header.label(text="Arme", icon="BONE_DATA")
 
         if body:
-            draw_bone_prop_with_status_per_side(
+            draw_bone_props_per_side_foldouts(
                 body,
                 context,
-                ARME,
+                Arme,
+                panel_prefix="definition_arms",
+                default_closed=True,
             )
 
         # Beine
-        header, body = layout.panel(
+        body = draw_foldout(
+            layout,
             "definition_legs",
+            "Beine",
+            icon="BONE_DATA",
             default_closed=True,
         )
-        header.label(text="Beine", icon="BONE_DATA")
 
         if body:
-            draw_bone_prop_with_status_per_side(
+            draw_bone_props_per_side_foldouts(
                 body,
                 context,
-                BEINE,
+                Beine,
+                panel_prefix="definition_legs",
+                default_closed=True,
             )
 
         # Finger
-        header, body = layout.panel(
+        body = draw_foldout(
+            layout,
             "definition_fingers",
+            "Finger",
+            icon="BONE_DATA",
             default_closed=True,
         )
-        header.label(text="Finger", icon="BONE_DATA")
 
         if body:
-            draw_finger_bone_props_grouped(
+            draw_finger_bone_props_grouped_foldouts(
                 body,
                 context,
-                FINGER,
+                Finger,
+                panel_prefix="definition_fingers",
                 prop_button=True,
+                side_default_closed=True,
+                finger_default_closed=True,
             )

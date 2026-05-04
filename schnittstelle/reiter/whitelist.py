@@ -32,7 +32,7 @@ class MERGE_WHITELIST_panel(Panel):
             pick_button.enabled = armature is not None
             pick_op = pick_button.operator(Operatoren.AUSWÄHLEN, text="", icon="BONE_DATA")
             pick_op.item_index = index
-            remove_op = item_row.operator(Operatoren.VERNICHTEN, text="", icon="X")
+            remove_op = item_row.operator(Operatoren.VERBIETEN, text="", icon="X")
             remove_op.item_index = index
 
         button_row = box.row(align=True)

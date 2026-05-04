@@ -232,6 +232,7 @@ PROPS = [
 
     # ===========================================================
     # mixamo
+    ("root", StringProperty(name="Root", default="root")),
     ("head", StringProperty(name="Head", default="mixamorig:Head")),
     ("first_neck", StringProperty(name="1st Neck", default="mixamorig:Neck")),
     ("last_neck", StringProperty(name="Last Neck", default="mixamorig:Neck")),
