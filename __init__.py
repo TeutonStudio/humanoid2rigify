@@ -11,10 +11,11 @@ bl_info = {
     "category": "Object",
 }
 
-from . import operatoren, schnittstelle
+from . import operatoren, schnittstelle, __eigenschaften__
 _MODULES = [
     schnittstelle,
     operatoren,
+    __eigenschaften__,
 ]
 
 def register():
