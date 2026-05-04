@@ -30,30 +30,14 @@ def register():
 
 CLASSES = [
     MergeWhitelistItem,
-    # CachedBoneNameItem,
 ]
-
-#   from .schnittstelle.__methoden__ import my_settings_callback
 
 
 class MergeWhitelistItem(bpy.types.PropertyGroup):
     value: StringProperty(name="Value", default="")
 
-#   class CachedBoneNameItem(bpy.types.PropertyGroup):
-#       name: StringProperty(name="Bone")
-
-from . import __methoden__ as root_methoden
-
 
 def unregister():
-    #   root_methoden._MERGE_WHITELIST_INIT_SCENE = None
-    #   root_methoden._BONE_NAME_CACHE_INIT_SCENE = None
-    #   root_methoden._BONE_NAME_CACHE_INIT_ARMATURE = None
-    #   root_methoden._BONE_NAME_CACHE.clear()
-    #   if bpy.app.timers.is_registered(root_methoden.initialize_pending_bone_name_cache):
-    #       bpy.app.timers.unregister(root_methoden.initialize_pending_bone_name_cache)
-    #   if bpy.app.timers.is_registered(root_methoden.initialize_pending_merge_whitelist):
-    #       bpy.app.timers.unregister(root_methoden.initialize_pending_merge_whitelist)
     for (prop_name, _) in PROPS:
         delattr(bpy.types.Scene, prop_name)
     for cls in reversed(CLASSES):
@@ -61,7 +45,6 @@ def unregister():
 
 
 def register():
-    #   root_methoden._BONE_NAME_CACHE.clear()
     for cls in CLASSES:
         bpy.utils.register_class(cls)
     for (prop_name, prop_value) in PROPS:
@@ -70,7 +53,6 @@ def register():
 
 CLASSES = [
     MergeWhitelistItem,
-    # CachedBoneNameItem,
 ]
 
 
@@ -217,9 +199,6 @@ PROPS = [
     ("copy_loc_constr", BoolProperty(name="Stretch", default=True)),
     ("fingers_bool_r", BoolProperty(name="right fingers", default=True)),
     ("fingers_bool_l", BoolProperty(name="left fingers", default=True)),
-    #   ("cached_bone_names", CollectionProperty(type=CachedBoneNameItem)),
-    #   ("cached_bone_names_armature", StringProperty(name="Cached Bone Armature", default="")),
-    #   ("cached_bone_names_count", IntProperty(name="Cached Bone Count", default=0)),
     ("merge_extra_bone_whitelist", CollectionProperty(type=MergeWhitelistItem)),
     (
         "generation_mode",
@@ -404,71 +383,44 @@ PROPS = [
 
     # fingers
     ("palm_pinky_r", StringProperty(name="palm_pinky_r", default="")),
-    ("pinky_01_r", StringProperty(name="pinky_1_r",
-                                  default="mixamorig:RightHandPinky1")),
-    ("pinky_02_r", StringProperty(name="pinky_2_r",
-                                  default="mixamorig:RightHandPinky2")),
-    ("pinky_03_r", StringProperty(name="pinky_3_r",
-                                  default="mixamorig:RightHandPinky3")),
+    ("pinky_01_r", StringProperty(name="pinky_1_r",default="mixamorig:RightHandPinky1")),
+    ("pinky_02_r", StringProperty(name="pinky_2_r",default="mixamorig:RightHandPinky2")),
+    ("pinky_03_r", StringProperty(name="pinky_3_r",default="mixamorig:RightHandPinky3")),
     ("palm_ring_r", StringProperty(name="palm_ring_r", default="")),
-    ("ring_01_r", StringProperty(name="ring_1_r",
-                                 default="mixamorig:RightHandRing1")),
-    ("ring_02_r", StringProperty(name="ring_2_r",
-                                 default="mixamorig:RightHandRing2")),
-    ("ring_03_r", StringProperty(name="ring_3_r",
-                                 default="mixamorig:RightHandRing3")),
+    ("ring_01_r", StringProperty(name="ring_1_r",default="mixamorig:RightHandRing1")),
+    ("ring_02_r", StringProperty(name="ring_2_r",default="mixamorig:RightHandRing2")),
+    ("ring_03_r", StringProperty(name="ring_3_r",default="mixamorig:RightHandRing3")),
     ("palm_middle_r", StringProperty(name="palm_middle_r", default="")),
-    ("middle_01_r", StringProperty(name="middle_1_r",
-                                   default="mixamorig:RightHandMiddle1")),
-    ("middle_02_r", StringProperty(name="middle_2_r",
-                                   default="mixamorig:RightHandMiddle2")),
-    ("middle_03_r", StringProperty(name="middle_3_r",
-                                   default="mixamorig:RightHandMiddle3")),
+    ("middle_01_r", StringProperty(name="middle_1_r",default="mixamorig:RightHandMiddle1")),
+    ("middle_02_r", StringProperty(name="middle_2_r",default="mixamorig:RightHandMiddle2")),
+    ("middle_03_r", StringProperty(name="middle_3_r",default="mixamorig:RightHandMiddle3")),
     ("palm_index_r", StringProperty(name="palm_index_r", default="")),
-    ("index_01_r", StringProperty(name="index_1_r",
-                                  default="mixamorig:RightHandIndex1")),
-    ("index_02_r", StringProperty(name="index_2_r",
-                                  default="mixamorig:RightHandIndex2")),
-    ("index_03_r", StringProperty(name="index_3_r",
-                                  default="mixamorig:RightHandIndex3")),
-    ("thumb_01_r", StringProperty(name="thumb_1_r",
-                                  default="mixamorig:RightHandThumb1")),
-    ("thumb_02_r", StringProperty(name="thumb_2_r",
-                                  default="mixamorig:RightHandThumb2")),
-    ("thumb_03_r", StringProperty(name="thumb_3_r",
-                                  default="mixamorig:RightHandThumb3")),
+    ("index_01_r", StringProperty(name="index_1_r",default="mixamorig:RightHandIndex1")),
+    ("index_02_r", StringProperty(name="index_2_r",default="mixamorig:RightHandIndex2")),
+    ("index_03_r", StringProperty(name="index_3_r",default="mixamorig:RightHandIndex3")),
+    ("thumb_01_r", StringProperty(name="thumb_1_r",default="mixamorig:RightHandThumb1")),
+    ("thumb_02_r", StringProperty(name="thumb_2_r",default="mixamorig:RightHandThumb2")),
+    ("thumb_03_r", StringProperty(name="thumb_3_r",default="mixamorig:RightHandThumb3")),
     # left fingers
     ("palm_pinky_l", StringProperty(name="palm_pinky_l", default="")),
-    ("pinky_01_l", StringProperty(
-        name="pinky_1_l", default="mixamorig:LeftHandPinky1")),
-    ("pinky_02_l", StringProperty(
-        name="pinky_2_l", default="mixamorig:LeftHandPinky2")),
-    ("pinky_03_l", StringProperty(
-        name="pinky_3_l", default="mixamorig:LeftHandPinky3")),
+    ("pinky_01_l", StringProperty(name="pinky_1_l", default="mixamorig:LeftHandPinky1")),
+    ("pinky_02_l", StringProperty(name="pinky_2_l", default="mixamorig:LeftHandPinky2")),
+    ("pinky_03_l", StringProperty(name="pinky_3_l", default="mixamorig:LeftHandPinky3")),
     ("palm_ring_l", StringProperty(name="palm_ring_l", default="")),
     ("ring_01_l", StringProperty(name="ring_1_l", default="mixamorig:LeftHandRing1")),
     ("ring_02_l", StringProperty(name="ring_2_l", default="mixamorig:LeftHandRing2")),
     ("ring_03_l", StringProperty(name="ring_3_l", default="mixamorig:LeftHandRing3")),
     ("palm_middle_l", StringProperty(name="palm_middle_l", default="")),
-    ("middle_01_l", StringProperty(
-        name="middle_1_l", default="mixamorig:LeftHandMiddle1")),
-    ("middle_02_l", StringProperty(
-        name="middle_2_l", default="mixamorig:LeftHandMiddle2")),
-    ("middle_03_l", StringProperty(
-        name="middle_3_l", default="mixamorig:LeftHandMiddle3")),
+    ("middle_01_l", StringProperty(name="middle_1_l", default="mixamorig:LeftHandMiddle1")),
+    ("middle_02_l", StringProperty(name="middle_2_l", default="mixamorig:LeftHandMiddle2")),
+    ("middle_03_l", StringProperty(name="middle_3_l", default="mixamorig:LeftHandMiddle3")),
     ("palm_index_l", StringProperty(name="palm_index_l", default="")),
-    ("index_01_l", StringProperty(
-        name="index_1_l", default="mixamorig:LeftHandIndex1")),
-    ("index_02_l", StringProperty(
-        name="index_2_l", default="mixamorig:LeftHandIndex2")),
-    ("index_03_l", StringProperty(
-        name="index_3_l", default="mixamorig:LeftHandIndex3")),
-    ("thumb_01_l", StringProperty(
-        name="thumb_1_l", default="mixamorig:LeftHandThumb1")),
-    ("thumb_02_l", StringProperty(
-        name="thumb_2_l", default="mixamorig:LeftHandThumb2")),
-    ("thumb_03_l", StringProperty(
-        name="thumb_3_l", default="mixamorig:LeftHandThumb3")),
+    ("index_01_l", StringProperty(name="index_1_l", default="mixamorig:LeftHandIndex1")),
+    ("index_02_l", StringProperty(name="index_2_l", default="mixamorig:LeftHandIndex2")),
+    ("index_03_l", StringProperty(name="index_3_l", default="mixamorig:LeftHandIndex3")),
+    ("thumb_01_l", StringProperty(name="thumb_1_l", default="mixamorig:LeftHandThumb1")),
+    ("thumb_02_l", StringProperty(name="thumb_2_l", default="mixamorig:LeftHandThumb2")),
+    ("thumb_03_l", StringProperty(name="thumb_3_l", default="mixamorig:LeftHandThumb3")),
 
     # legs
     ("thigh_l", StringProperty(name="Up Leg Left", default="mixamorig:LeftUpLeg")),

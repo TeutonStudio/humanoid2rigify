@@ -15,6 +15,7 @@ class MappingImportOperator(Operator):
         with open(json_file, encoding="utf-8") as json_file:
             data = json.load(json_file)
 
+        context.scene.root = data.get("root", context.scene.root)
         context.scene.head = data["head"]
         context.scene.first_neck = data["first_neck"]
         context.scene.last_neck = data["last_neck"]
@@ -76,6 +77,20 @@ class MappingImportOperator(Operator):
         context.scene.toe_r = data["toe_r"]
         context.scene.heel_r = data["heel_r"]
         context.scene.heel_l = data["heel_l"]
+        whitelist_values = data.get("merge_extra_bone_whitelist")
+
+        if isinstance(whitelist_values, list):
+            whitelist = context.scene.merge_extra_bone_whitelist
+
+            while len(whitelist) != 0:
+                whitelist.remove(len(whitelist) - 1)
+
+            for value in whitelist_values:
+                if not value:
+                    continue
+
+                item = whitelist.add()
+                item.value = str(value)
 
         self.report({"INFO"}, f"{context.scene.presets} preset imported")
         return {"FINISHED"}

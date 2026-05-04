@@ -72,6 +72,12 @@ class MappingSaveOperator(Operator):
             "toe_r": context.scene.toe_r,
             "heel_r": context.scene.heel_r,
             "heel_l": context.scene.heel_l,
+
+            "merge_extra_bone_whitelist": [
+                item.value
+                for item in context.scene.merge_extra_bone_whitelist
+                if item.value
+            ],
         }
 
         # ===========================================================
