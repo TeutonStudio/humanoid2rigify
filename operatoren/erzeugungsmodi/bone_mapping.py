@@ -313,13 +313,22 @@ def collect_extra_bones(armature_obj, params, derived_data):
 
 def build_extra_bone_data(armature_obj, extra_bones, weighted_vertex_groups, params):
     extra_bone_data = {}
+
     for bone_name in extra_bones:
         bone = get_bone(armature_obj, bone_name)
         if bone is None:
             continue
 
-        has_weights = bone_name in weighted_vertex_groups
         needs_new_merge_bone = is_merge_extra_bone_name(bone_name, params)
+
+        # Harte Whitelist:
+        # Nicht-whitelisted Extra-Bones bekommen kein Zielmapping
+        # und dürfen später nicht im neuen Rigify-Rig landen.
+        if not needs_new_merge_bone:
+            continue
+
+        has_weights = bone_name in weighted_vertex_groups
+
         extra_bone_data[bone_name] = {
             "source_bone": bone_name,
             "constraint_target": bone_name,
@@ -329,7 +338,7 @@ def build_extra_bone_data(armature_obj, extra_bones, weighted_vertex_groups, par
             "has_weights": has_weights,
             "is_hidden": bone.hide,
             "keep_in_deform_mode": bone.use_deform and has_weights,
-            "needs_new_merge_bone": needs_new_merge_bone,
+            "needs_new_merge_bone": True,
         }
 
     return extra_bone_data

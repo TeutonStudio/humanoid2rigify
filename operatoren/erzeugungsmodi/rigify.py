@@ -49,6 +49,49 @@ class RigifyBauModus:
         vollständig. Es wird keine externe the_script-Datei mehr importiert.
         """
 
+        def convert_source_roll_axis_to_target_space(source_obj, target_obj, source_bone):
+            source_matrix = source_obj.matrix_world.to_3x3()
+            target_matrix_inv = target_obj.matrix_world.inverted().to_3x3()
+            source_bone_matrix = source_bone.matrix_local.to_3x3()
+
+            # Lokale Z-Achse des Originalknochens in Ziel-Armature-Raum umrechnen.
+            roll_axis = (
+                    target_matrix_inv
+                    @ source_matrix
+                    @ source_bone_matrix
+                    @ Vector((0.0, 0.0, 1.0))
+            )
+
+            if roll_axis.length == 0:
+                return Vector((0.0, 0.0, 1.0))
+
+            return roll_axis.normalized()
+
+        def copy_edit_bone_roll_from_source(
+                source_obj,
+                target_obj,
+                source_bone_name: str,
+                target_bone_name: str | None = None,
+        ) -> None:
+            target_bone_name = target_bone_name or source_bone_name
+
+            source_bone = source_obj.data.bones.get(source_bone_name)
+            target_edit_bone = target_obj.data.edit_bones.get(target_bone_name)
+
+            if source_bone is None or target_edit_bone is None:
+                return
+
+            roll_axis = convert_source_roll_axis_to_target_space(
+                source_obj,
+                target_obj,
+                source_bone,
+            )
+
+            try:
+                target_edit_bone.align_roll(roll_axis)
+            except RuntimeError:
+                pass
+
         def ensure_rigify_enabled() -> None:
             if "rigify" not in bpy.context.preferences.addons:
                 bpy.ops.preferences.addon_enable(module="rigify")
@@ -576,8 +619,40 @@ class RigifyBauModus:
 
         all_external_bone_names = get_all_bone_names(external_obj, "DATA")
 
+        whitelisted_extra_bones = {
+            bone_name
+            for bone_name, data in self.context.extra_bone_data.items()
+            if data.get("needs_new_merge_bone", False)
+        }
+
+        standard_source_bones = {
+            value
+            for value in parameters.values()
+            if isinstance(value, str) and value
+        }
+
+        standard_source_bones.update(all_spines)
+        standard_source_bones.update(all_necks)
+
+        generated_helper_bones = {
+            "heel_l",
+            "heel_r",
+            "new_torso",
+            "skeleton:TransformationTarget",
+            "skeleton:torso_bone",
+        }
+
+        allowed_metarig_bones = (
+                standard_source_bones
+                | whitelisted_extra_bones
+                | generated_helper_bones
+        )
+
         for bone_name in all_external_bone_names:
             if bone_name in excluded_bones_to_create:
+                continue
+
+            if bone_name not in allowed_metarig_bones:
                 continue
 
             source_bone = external_obj.data.bones.get(bone_name)
@@ -786,6 +861,14 @@ class RigifyBauModus:
 
             child_bone.use_connect = use_connect
 
+        # Roll der übernommenen Whitelist-Zusatzknochen vom Original übernehmen.
+        for bone_name in whitelisted_extra_bones:
+            copy_edit_bone_roll_from_source(
+                external_obj,
+                metarig_obj,
+                bone_name,
+            )
+
         if (
                 hip_spine_bool
                 and less_spine_bones
@@ -827,11 +910,7 @@ class RigifyBauModus:
 
         all_skeleton_pose_bone_names = get_all_bone_names(external_obj, "DATA")
 
-        extra_bones = [
-            bone_name
-            for bone_name in all_skeleton_pose_bone_names
-            if bone_name not in mapped_bone_names
-        ]
+        extra_bones = sorted(whitelisted_extra_bones)
 
         ensure_mode(metarig_obj, "EDIT")
         all_metarig_edit_names = {bone.name for bone in metarig_obj.data.edit_bones}
@@ -1463,12 +1542,13 @@ class RigifyBauModus:
             setattr(target_color.custom, custom_field, color)
 
     def resolve_target_transform_bone(
-        self,
-        source_pose_bone,
-        rigify_obj,
-        target_name_key: str,
+            self,
+            source_pose_bone,
+            rigify_obj,
+            target_name_key: str,
     ):
         transform_bone = getattr(source_pose_bone, "custom_shape_transform", None)
+
         if transform_bone is None:
             return None
 
@@ -1476,15 +1556,25 @@ class RigifyBauModus:
             return rigify_obj.pose.bones.get(Wirbelsäule.WURZEL)
 
         transform_mapping = self.context.source_to_target_map.get(transform_bone.name)
+
         if transform_mapping is not None:
             target_name = transform_mapping.get(target_name_key)
+
             if target_name and rigify_obj.pose.bones.get(target_name) is not None:
                 return rigify_obj.pose.bones[target_name]
 
             fallback_name = transform_mapping.get("constraint_target")
+
             if fallback_name and rigify_obj.pose.bones.get(fallback_name) is not None:
                 return rigify_obj.pose.bones[fallback_name]
 
+            merge_name = transform_mapping.get("merge_target")
+
+            if merge_name and rigify_obj.pose.bones.get(merge_name) is not None:
+                return rigify_obj.pose.bones[merge_name]
+
+        # Nur als letzter Fallback:
+        # funktioniert für Bones, die im Rigify-Rig denselben Namen behalten.
         return rigify_obj.pose.bones.get(transform_bone.name)
 
     def copy_custom_shape_settings(
@@ -1610,9 +1700,34 @@ class RigifyBauModus:
                 target_transform_bone,
             )
 
+            if not mapping.get("is_standard", True):
+                self.copy_pose_transform(
+                    source_pose_bone,
+                    target_pose_bone,
+                )
+
             self.copy_bone_color(source_pose_bone.color, target_pose_bone.color)
             self.copy_bone_color(source_pose_bone.bone.color, target_pose_bone.bone.color)
 
             copied_count += 1
 
         return copied_count
+
+    def copy_pose_transform(self, source_pose_bone, target_pose_bone) -> None:
+        target_pose_bone.location = source_pose_bone.location.copy()
+        target_pose_bone.scale = source_pose_bone.scale.copy()
+
+        target_pose_bone.rotation_mode = source_pose_bone.rotation_mode
+
+        if source_pose_bone.rotation_mode == "QUATERNION":
+            target_pose_bone.rotation_quaternion = (
+                source_pose_bone.rotation_quaternion.copy()
+            )
+        elif source_pose_bone.rotation_mode == "AXIS_ANGLE":
+            target_pose_bone.rotation_axis_angle = (
+                source_pose_bone.rotation_axis_angle[:]
+            )
+        else:
+            target_pose_bone.rotation_euler = (
+                source_pose_bone.rotation_euler.copy()
+            )
