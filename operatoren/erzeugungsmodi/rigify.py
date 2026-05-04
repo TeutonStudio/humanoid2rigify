@@ -1,12 +1,570 @@
 import bpy
 import rigify
+import re
 from mathutils import Vector
 
 from ...__eigenschaften__ import Wirbelsäule
 from ...operatoren.erzeugungsmodi.__methoden__ import get_generated_rigify_object
 
-GENERIC_CIRCLE_WIDGET_VERTEX_COUNT = 32
+DEFAULT_VISIBLE_RIG_LAYER_INDICES = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
 
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+
+    31,
+]
+GENERIC_CIRCLE_WIDGET_VERTEX_COUNT = 32
+INTERNAL_RIGIFY_PREFIXES = ("DEF-", "MCH-", "ORG-")
+EXTRA_GROUP_COLLECTION_PREFIX = "Extra"
+
+EXTRA_GROUP_UI_START_ROW = 18
+
+LAYER_COLLECTION_NAMES = {
+    0: "Face",
+    1: "Face (Primary)",
+    2: "Face (Secondary)",
+
+    3: "Torso",
+    4: "Torso (Tweak)",
+
+    5: "Fingers",
+    6: "Fingers (Detail)",
+
+    7: "Arm.L (IK)",
+    8: "Arm.L (FK)",
+    9: "Arm.L (Tweak)",
+
+    10: "Arm.R (IK)",
+    11: "Arm.R (FK)",
+    12: "Arm.R (Tweak)",
+
+    13: "Leg.L (IK)",
+    14: "Leg.L (FK)",
+    15: "Leg.L (Tweak)",
+
+    16: "Leg.R (IK)",
+    17: "Leg.R (FK)",
+    18: "Leg.R (Tweak)",
+
+    27: "Additional",
+    31: "Root",
+}
+
+# Name, der im Rigify-UI angezeigt wird.
+# Die Collection-Namen bleiben eindeutig, weil Blender doppelte Namen sonst wieder
+# in .001-Höllen verwandelt.
+RIGIFY_UI_TITLES = {
+    0: "Face",
+    1: "Primary",
+    2: "Secondary",
+
+    3: "Torso",
+    4: "Tweak",
+
+    5: "Fingers",
+    6: "Detail",
+
+    7: "Arm.L (IK)",
+    10: "Arm.R (IK)",
+
+    8: "FK",
+    11: "FK",
+
+    9: "Tweak",
+    12: "Tweak",
+
+    13: "Leg.L (IK)",
+    16: "Leg.R (IK)",
+
+    14: "FK",
+    17: "FK",
+
+    15: "Tweak",
+    18: "Tweak",
+
+    27: "Additional",
+    31: "Root",
+}
+
+RIGIFY_UI_ROWS = {
+    # Face
+    0: 1,
+
+    # Primary / Secondary
+    1: 2,
+    2: 2,
+
+    # Separator row 3
+
+    # Torso
+    3: 4,
+    4: 5,
+
+    # Fingers
+    5: 6,
+    6: 7,
+
+    # Separator row 8
+
+    # Arms
+    7: 9,
+    10: 9,
+
+    8: 10,
+    11: 10,
+
+    9: 11,
+    12: 11,
+
+    # Separator row 12
+
+    # Legs
+    13: 13,
+    16: 13,
+
+    14: 14,
+    17: 14,
+
+    15: 15,
+    18: 15,
+
+    # Separator row 16
+
+    # Root
+    31: 17,
+
+    # Whitelist / Additional
+    27: EXTRA_GROUP_UI_START_ROW,
+}
+
+STANDARD_LAYER_UI_ORDER = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+
+    7,
+    10,
+    8,
+    11,
+    9,
+    12,
+
+    13,
+    16,
+    14,
+    17,
+    15,
+    18,
+
+    31,
+    27,
+]
+
+STANDARD_COLLECTION_NAMES = set(LAYER_COLLECTION_NAMES.values())
+
+FK_COLOR = {
+    "normal": (0.15, 0.75, 0.20),
+    "select": (0.45, 1.00, 0.45),
+    "active": (0.75, 1.00, 0.75),
+}
+
+IK_COLOR = {
+    "normal": (0.85, 0.15, 0.12),
+    "select": (1.00, 0.35, 0.30),
+    "active": (1.00, 0.65, 0.55),
+}
+
+TWEAK_COLOR = {
+    "normal": (0.2196078431, 0.4980392157, 0.7843137255),  # #387FC8
+    "select": (0.5960784314, 0.8980392157, 1.0),           # #98E5FF
+    "active": (0.7686274510, 1.0, 1.0),                    # #C4FFFF
+}
+
+COLLECTION_LAYER_BY_NAME = {
+    collection_name: layer_index
+    for layer_index, collection_name in LAYER_COLLECTION_NAMES.items()
+}
+
+# ============================================================
+# Globale Rigify-Helfer: Collections / Farben
+# ============================================================
+
+def get_collection_name(layer_index: int) -> str:
+    return LAYER_COLLECTION_NAMES.get(layer_index, f"Layer {layer_index + 1}")
+
+
+def uses_bone_collections(armature_data) -> bool:
+    return hasattr(armature_data, "collections_all")
+
+
+def ist_interner_rigify_knochen(bone_name: str) -> bool:
+    return bone_name.startswith(INTERNAL_RIGIFY_PREFIXES)
+
+def finde_seite_aus_name(bone_name: str) -> str | None:
+    name = bone_name.lower()
+
+    # Erlaubt z.B. ".L", ".L.001", "_l", "_l.001", "-r", "-r.001"
+    if re.search(r"(\.l|_l|-l)(?:\.\d+)?$", name):
+        return "L"
+
+    if re.search(r"(\.r|_r|-r)(?:\.\d+)?$", name):
+        return "R"
+
+    # Erlaubt Seitenmarker in der Mitte, z.B. "hand.L_tweak"
+    if re.search(r"(\.l|_l|-l)(?=[._-])", name):
+        return "L"
+
+    if re.search(r"(\.r|_r|-r)(?=[._-])", name):
+        return "R"
+
+    return None
+
+
+def ist_linke_seite(bone_name: str) -> bool:
+    return finde_seite_aus_name(bone_name) == "L"
+
+
+def ist_rechte_seite(bone_name: str) -> bool:
+    return finde_seite_aus_name(bone_name) == "R"
+
+
+def ist_fk_control_bone(bone_name: str) -> bool:
+    name = bone_name.lower()
+
+    if ist_interner_rigify_knochen(bone_name):
+        return False
+
+    return any(token in name for token in (
+        "_fk",
+        ".fk",
+        "-fk",
+        "fk_",
+        "fk.",
+        "fk-",
+    ))
+
+
+def ist_ik_control_bone(bone_name: str) -> bool:
+    name = bone_name.lower()
+
+    if ist_interner_rigify_knochen(bone_name):
+        return False
+
+    return any(token in name for token in (
+        "_ik",
+        ".ik",
+        "-ik",
+        "ik_",
+        "ik.",
+        "ik-",
+        "ik_target",
+        "ik_pole",
+    ))
+
+
+def ist_tweak_control_bone(bone_name: str) -> bool:
+    name = bone_name.lower()
+
+    if ist_interner_rigify_knochen(bone_name):
+        return False
+
+    return any(token in name for token in (
+        "_tweak",
+        ".tweak",
+        "-tweak",
+        "tweak_",
+        "tweak.",
+        "tweak-",
+    ))
+
+
+def ist_torso_tweak_control_bone(bone_name: str) -> bool:
+    name = bone_name.lower()
+
+    if ist_interner_rigify_knochen(bone_name):
+        return False
+
+    return (
+        name.startswith("tweak_pelvis")
+        or name.startswith("tweak_spine")
+        or name.startswith("tweak_neck")
+        or name.startswith("tweak_chest")
+        or name.startswith("tweak_torso")
+        or "spine_tweak" in name
+        or "neck_tweak" in name
+        or "pelvis_tweak" in name
+    )
+
+
+def ist_arm_control_bone(bone_name: str) -> bool:
+    name = bone_name.lower()
+
+    return any(part in name for part in (
+        "upperarm",
+        "upper_arm",
+        "lowerarm",
+        "lower_arm",
+        "forearm",
+        "hand",
+        "arm_",
+        "arm.",
+        "arm-",
+    ))
+
+
+def ist_bein_control_bone(bone_name: str) -> bool:
+    name = bone_name.lower()
+
+    return any(part in name for part in (
+        "thigh",
+        "shin",
+        "calf",
+        "foot",
+        "toe",
+        "heel",
+        "leg_",
+        "leg.",
+        "leg-",
+    ))
+
+def setze_bone_color(bone_color, normal, select, active) -> None:
+    if bone_color is None:
+        return
+
+    bone_color.palette = "CUSTOM"
+    bone_color.custom.normal = normal
+    bone_color.custom.select = select
+    bone_color.custom.active = active
+
+
+def setze_pose_bone_color(pose_bone, color_data: dict[str, tuple[float, float, float]]) -> None:
+    setze_bone_color(
+        getattr(pose_bone, "color", None),
+        color_data["normal"],
+        color_data["select"],
+        color_data["active"],
+    )
+
+    setze_bone_color(
+        getattr(pose_bone.bone, "color", None),
+        color_data["normal"],
+        color_data["select"],
+        color_data["active"],
+    )
+def get_bone_standard_layer_indices(armature_data, bone) -> set[int]:
+    layer_indices: set[int] = set()
+
+    if bone is None:
+        return layer_indices
+
+    if not uses_bone_collections(armature_data):
+        for index, enabled in enumerate(getattr(bone, "layers", [])):
+            if enabled:
+                layer_indices.add(index)
+
+        return layer_indices
+
+    for collection in getattr(bone, "collections", []):
+        collection_name = getattr(collection, "name", str(collection))
+        layer_index = COLLECTION_LAYER_BY_NAME.get(collection_name)
+
+        if layer_index is not None:
+            layer_indices.add(layer_index)
+
+    return layer_indices
+
+
+def finde_seite_aus_aktueller_collection(armature_data, bone, bereich: str) -> str | None:
+    layer_indices = get_bone_standard_layer_indices(armature_data, bone)
+
+    if bereich == "arm":
+        if layer_indices & {7, 8, 9}:
+            return "L"
+
+        if layer_indices & {10, 11, 12}:
+            return "R"
+
+    if bereich == "bein":
+        if layer_indices & {13, 14, 15}:
+            return "L"
+
+        if layer_indices & {16, 17, 18}:
+            return "R"
+
+    return None
+
+
+def layer_fuer_seite_und_typ(seite: str | None, links_layer: int, rechts_layer: int) -> int | None:
+    if seite == "L":
+        return links_layer
+
+    if seite == "R":
+        return rechts_layer
+
+    return None
+
+def get_or_create_collection_by_layer(armature_data, layer_index: int):
+    collection_name = get_collection_name(layer_index)
+    bone_collection = armature_data.collections_all.get(collection_name)
+
+    if bone_collection is None:
+        bone_collection = armature_data.collections.new(collection_name)
+
+    if hasattr(bone_collection, "rigify_ui_row"):
+        bone_collection.rigify_ui_row = RIGIFY_UI_ROWS.get(layer_index, EXTRA_GROUP_UI_START_ROW)
+
+    if hasattr(bone_collection, "rigify_ui_title"):
+        bone_collection.rigify_ui_title = RIGIFY_UI_TITLES.get(layer_index, collection_name)
+
+    bone_collection.is_visible = True
+    return bone_collection
+
+def initialisiere_standard_bone_collections(armature_data) -> None:
+    if not uses_bone_collections(armature_data):
+        return
+
+    for layer_index in STANDARD_LAYER_UI_ORDER:
+        get_or_create_collection_by_layer(armature_data, layer_index)
+
+def assign_standard_bone_collection(rig_obj, bone_name: str, layer_index: int) -> None:
+    armature_data = rig_obj.data
+    bone = armature_data.bones.get(bone_name)
+
+    if bone is None:
+        return
+
+    if not uses_bone_collections(armature_data):
+        bone.layers[layer_index] = True
+
+        for index in range(32):
+            if index != layer_index:
+                bone.layers[index] = False
+
+        return
+
+    target_collection = get_or_create_collection_by_layer(armature_data, layer_index)
+
+    # Nur Standard-Rigify-Collections entfernen. Extra-Gruppen bleiben erhalten.
+    for collection in armature_data.collections_all:
+        if collection.name not in STANDARD_COLLECTION_NAMES:
+            continue
+
+        try:
+            collection.unassign(bone)
+        except RuntimeError:
+            pass
+
+    target_collection.assign(bone)
+
+
+def errate_standard_layer_fuer_control(rig_obj, pose_bone) -> int | None:
+    bone_name = pose_bone.name
+    bone = pose_bone.bone
+    armature_data = rig_obj.data
+
+    # Torso-Tweaks zuerst, sonst landen tweak_spine_* im Torso.
+    if ist_torso_tweak_control_bone(bone_name):
+        return 4
+
+    ist_fk = ist_fk_control_bone(bone_name)
+    ist_ik = ist_ik_control_bone(bone_name)
+    ist_tweak = ist_tweak_control_bone(bone_name)
+
+    # Sonderfall: manche Rigify-Tweak-Bones heißen nicht sauber *_tweak,
+    # sondern z.B. lowerarm_.001. Danke, Blender, sehr hilfreich.
+    name = bone_name.lower()
+    if not ist_tweak and re.search(r"(upperarm|upper_arm|lowerarm|lower_arm|forearm|calf|shin|thigh|foot|toe|heel).*\.\d+$", name):
+        ist_tweak = True
+
+    if not (ist_fk or ist_ik or ist_tweak):
+        return None
+
+    if ist_arm_control_bone(bone_name):
+        seite = finde_seite_aus_name(bone_name)
+        seite = seite or finde_seite_aus_aktueller_collection(armature_data, bone, "arm")
+
+        if ist_tweak:
+            return layer_fuer_seite_und_typ(seite, 9, 12)
+
+        if ist_fk:
+            return layer_fuer_seite_und_typ(seite, 8, 11)
+
+        if ist_ik:
+            return layer_fuer_seite_und_typ(seite, 7, 10)
+
+    if ist_bein_control_bone(bone_name):
+        seite = finde_seite_aus_name(bone_name)
+        seite = seite or finde_seite_aus_aktueller_collection(armature_data, bone, "bein")
+
+        if ist_tweak:
+            return layer_fuer_seite_und_typ(seite, 15, 18)
+
+        if ist_fk:
+            return layer_fuer_seite_und_typ(seite, 14, 17)
+
+        if ist_ik:
+            return layer_fuer_seite_und_typ(seite, 13, 16)
+
+    return None
+
+
+def repariere_standard_control_collections(rig_obj) -> None:
+    if rig_obj is None or rig_obj.type != "ARMATURE":
+        return
+
+    for pose_bone in rig_obj.pose.bones:
+        layer_index = errate_standard_layer_fuer_control(rig_obj, pose_bone)
+
+        if layer_index is None:
+            continue
+
+        assign_standard_bone_collection(rig_obj, pose_bone.name, layer_index)
+
+
+def normalisiere_rigify_standardfarben(rig_obj) -> None:
+    if rig_obj is None or rig_obj.type != "ARMATURE":
+        return
+
+    rig_obj.data.show_bone_colors = True
+
+    for pose_bone in rig_obj.pose.bones:
+        if ist_tweak_control_bone(pose_bone.name) or ist_torso_tweak_control_bone(pose_bone.name):
+            setze_pose_bone_color(pose_bone, TWEAK_COLOR)
+            continue
+
+        if ist_fk_control_bone(pose_bone.name):
+            setze_pose_bone_color(pose_bone, FK_COLOR)
+            continue
+
+        if ist_ik_control_bone(pose_bone.name):
+            setze_pose_bone_color(pose_bone, IK_COLOR)
+
+
+# ============================================================
+# Bau-Modus
+# ============================================================
 
 class RigifyBauModus:
     def __init__(self, context):
@@ -35,62 +593,39 @@ class RigifyBauModus:
             self.source_armature,
             self.params,
         )
-        rigify_obj =get_generated_rigify_object(self.source_armature)
-        faerbe_fk_knochen_gruen(rigify_obj)
+
+        rigify_obj = get_generated_rigify_object(self.source_armature)
+        repariere_standard_control_collections(rigify_obj)
+        normalisiere_rigify_sichtbarkeit(rigify_obj)
+        normalisiere_rigify_standardfarben(rigify_obj)
 
         return rigify_obj
 
     def generiere_rigify_rig(self, skeleton_model, parameters) -> None:
-        """
-        Erzeugt direkt ein Rigify-Rig aus der Quell-Armature.
-
-        Diese Methode ersetzt den alten Aufruf:
-
-            any_rig_to_rigify_v2.the_script(...)
-
-        vollständig. Es wird keine externe the_script-Datei mehr importiert.
-        """
-
         def convert_source_roll_axis_to_target_space(source_obj, target_obj, source_bone):
             source_matrix = source_obj.matrix_world.to_3x3()
             target_matrix_inv = target_obj.matrix_world.inverted().to_3x3()
             source_bone_matrix = source_bone.matrix_local.to_3x3()
-
-            # Lokale Z-Achse des Originalknochens in Ziel-Armature-Raum umrechnen.
-            roll_axis = (
-                    target_matrix_inv
-                    @ source_matrix
-                    @ source_bone_matrix
-                    @ Vector((0.0, 0.0, 1.0))
-            )
-
-            if roll_axis.length == 0:
-                return Vector((0.0, 0.0, 1.0))
-
-            return roll_axis.normalized()
+            roll_axis = target_matrix_inv @ source_matrix @ source_bone_matrix @ Vector((0.0, 0.0, 1.0))
+            return Vector((0.0, 0.0, 1.0)) if roll_axis.length == 0 else roll_axis.normalized()
 
         def copy_edit_bone_roll_from_source(
-                source_obj,
-                target_obj,
-                source_bone_name: str,
-                target_bone_name: str | None = None,
+            source_obj,
+            target_obj,
+            source_bone_name: str,
+            target_bone_name: str | None = None,
         ) -> None:
             target_bone_name = target_bone_name or source_bone_name
-
             source_bone = source_obj.data.bones.get(source_bone_name)
             target_edit_bone = target_obj.data.edit_bones.get(target_bone_name)
 
             if source_bone is None or target_edit_bone is None:
                 return
 
-            roll_axis = convert_source_roll_axis_to_target_space(
-                source_obj,
-                target_obj,
-                source_bone,
-            )
-
             try:
-                target_edit_bone.align_roll(roll_axis)
+                target_edit_bone.align_roll(
+                    convert_source_roll_axis_to_target_space(source_obj, target_obj, source_bone)
+                )
             except RuntimeError:
                 pass
 
@@ -113,10 +648,7 @@ class RigifyBauModus:
             if bpy.context.view_layer.objects.active != obj:
                 make_object_active(obj)
 
-            if bpy.context.object is None:
-                return
-
-            if bpy.context.object.mode != mode_name:
+            if bpy.context.object is not None and bpy.context.object.mode != mode_name:
                 bpy.ops.object.mode_set(mode=mode_name)
 
         def get_all_bone_names(obj, mode_name: str = "DATA") -> list[str]:
@@ -133,53 +665,15 @@ class RigifyBauModus:
 
             return [bone.name for bone in obj.data.bones]
 
-        def uses_bone_collections(armature_data) -> bool:
-            return hasattr(armature_data, "collections_all")
-
-        def get_collection_name(layer_index: int) -> str:
-            return {
-                0: "Face",
-                3: "Torso",
-                5: "Fingers",
-                6: "Fingers (Detail)",
-                7: "Arm.L (IK)",
-                8: "Arm.L (FK)",
-                9: "Arm.L (Tweak)",
-                10: "Arm.R (IK)",
-                11: "Arm.R (FK)",
-                12: "Arm.R (Tweak)",
-                13: "Leg.L (IK)",
-                14: "Leg.L (FK)",
-                15: "Leg.L (Tweak)",
-                16: "Leg.R (IK)",
-                17: "Leg.R (FK)",
-                18: "Leg.R (Tweak)",
-                27: "Additional",
-                31: "Root",
-            }.get(layer_index, f"Layer {layer_index + 1}")
-
         def get_or_create_bone_collection(armature_data, layer_index: int):
-            collection_name = get_collection_name(layer_index)
-            bone_collection = armature_data.collections_all.get(collection_name)
-
-            if bone_collection is None:
-                bone_collection = armature_data.collections.new(collection_name)
-
-            if hasattr(bone_collection, "rigify_ui_row") and collection_name == "Additional":
-                bone_collection.rigify_ui_row = 11
-
-            bone_collection.is_visible = True
-            return bone_collection
-
-        EXTRA_GROUP_COLLECTION_PREFIX = "Extra"
+            return get_or_create_collection_by_layer(armature_data, layer_index)
 
         def sanitize_extra_group_name(value: str, fallback: str = "Additional") -> str:
             value = (value or "").strip()
             return value if value else fallback
 
         def extra_group_collection_name(group_name: str) -> str:
-            group_name = sanitize_extra_group_name(group_name)
-            return f"{EXTRA_GROUP_COLLECTION_PREFIX}: {group_name}"
+            return f"{EXTRA_GROUP_COLLECTION_PREFIX}: {sanitize_extra_group_name(group_name)}"
 
         def is_extra_group_collection(collection) -> bool:
             return collection.name.startswith(f"{EXTRA_GROUP_COLLECTION_PREFIX}:")
@@ -188,49 +682,31 @@ class RigifyBauModus:
             if not uses_bone_collections(armature_data):
                 return 0
 
-            max_row = 0
-
-            for collection in armature_data.collections_all:
-                if is_extra_group_collection(collection):
-                    continue
-
-                row = getattr(collection, "rigify_ui_row", 0)
-
-                if row > max_row:
-                    max_row = row
-
-            return max_row
+            return max(
+                [
+                    getattr(collection, "rigify_ui_row", 0)
+                    for collection in armature_data.collections_all
+                    if not is_extra_group_collection(collection)
+                ]
+                or [0]
+            )
 
         def build_extra_group_ui_rows(armature_data) -> dict[str, int]:
-            """
-            Erstellt stabile UI-Zeilen für alle Whitelist-Gruppen.
-            Startet nach der letzten bereits vorhandenen Nicht-Extra-Rigify-UI-Zeile.
-            +2 lässt eine Leerzeile Abstand zur Standard-Rigify-Liste.
-            """
-            start_row = get_max_rigify_ui_row(armature_data) + 2
+            start_row = EXTRA_GROUP_UI_START_ROW
             rows: dict[str, int] = {}
 
             for data in self.context.extra_bone_data.values():
                 if not data.get("needs_new_merge_bone", False):
                     continue
 
-                group_name = sanitize_extra_group_name(
-                    data.get("whitelist_group_name", "Additional")
-                )
-
-                if group_name not in rows:
-                    rows[group_name] = start_row + len(rows)
+                group_name = sanitize_extra_group_name(data.get("whitelist_group_name", "Additional"))
+                rows.setdefault(group_name, start_row + len(rows))
 
             return rows
 
-        def get_or_create_extra_group_collection(
-            armature_data,
-            group_name: str,
-            ui_row: int,
-        ):
+        def get_or_create_extra_group_collection(armature_data, group_name: str, ui_row: int):
             group_name = sanitize_extra_group_name(group_name)
             collection_name = extra_group_collection_name(group_name)
-
             bone_collection = armature_data.collections_all.get(collection_name)
 
             if bone_collection is None:
@@ -243,99 +719,7 @@ class RigifyBauModus:
                 bone_collection.rigify_ui_title = group_name
 
             bone_collection.is_visible = True
-
             return bone_collection
-
-        def assign_bone_to_extra_group_collection(
-            obj,
-            bone_name: str,
-            group_name: str,
-            ui_row: int,
-        ) -> None:
-            armature_data = obj.data
-            bone = armature_data.bones.get(bone_name)
-
-            if bone is None:
-                return
-
-            if not uses_bone_collections(armature_data):
-                assign_bone_to_layer_group(obj, bone_name, 27)
-                return
-
-            target_collection = get_or_create_extra_group_collection(
-                armature_data,
-                group_name,
-                ui_row,
-            )
-
-            for collection in armature_data.collections_all:
-                try:
-                    collection.unassign(bone)
-                except RuntimeError:
-                    pass
-
-            target_collection.assign(bone)
-
-        def apply_extra_group_collections(obj, extra_group_ui_rows: dict[str, int]) -> list[str]:
-            if obj is None or obj.type != "ARMATURE":
-                return []
-
-            if not uses_bone_collections(obj.data):
-                return []
-
-            assigned_collection_names: list[str] = []
-
-            for source_bone_name, data in self.context.extra_bone_data.items():
-                if not data.get("needs_new_merge_bone", False):
-                    continue
-
-                group_name = sanitize_extra_group_name(
-                    data.get("whitelist_group_name", "Additional")
-                )
-
-                ui_row = extra_group_ui_rows.get(group_name)
-
-                if ui_row is None:
-                    continue
-
-                collection_name = extra_group_collection_name(group_name)
-
-                # Preferiere sichtbare Steuerknochen. DEF-Bones nur als Fallback.
-                candidate_bone_names = [
-                    data.get("constraint_target"),
-                    source_bone_name,
-                    data.get("merge_target"),
-                ]
-
-                assigned_bone = False
-                seen_names: set[str] = set()
-
-                for candidate_bone_name in candidate_bone_names:
-                    if not candidate_bone_name:
-                        continue
-
-                    if candidate_bone_name in seen_names:
-                        continue
-
-                    seen_names.add(candidate_bone_name)
-
-                    if obj.data.bones.get(candidate_bone_name) is None:
-                        continue
-
-                    assign_bone_to_extra_group_collection(
-                        obj,
-                        candidate_bone_name,
-                        group_name,
-                        ui_row,
-                    )
-
-                    assigned_bone = True
-                    break
-
-                if assigned_bone and collection_name not in assigned_collection_names:
-                    assigned_collection_names.append(collection_name)
-
-            return assigned_collection_names
 
         def assign_bone_to_layer_group(obj, bone_name: str, layer_index: int) -> None:
             armature_data = obj.data
@@ -345,10 +729,7 @@ class RigifyBauModus:
                 return
 
             if uses_bone_collections(armature_data):
-                target_collection = get_or_create_bone_collection(
-                    armature_data,
-                    layer_index,
-                )
+                target_collection = get_or_create_bone_collection(armature_data, layer_index)
 
                 for collection in armature_data.collections_all:
                     try:
@@ -365,19 +746,68 @@ class RigifyBauModus:
                 if index != layer_index:
                     bone.layers[index] = False
 
-        def set_visible_rig_layers(
-            obj,
-            layer_indices,
-            extra_collection_names=(),
-        ) -> None:
+        def assign_bone_to_extra_group_collection(obj, bone_name: str, group_name: str, ui_row: int) -> None:
+            armature_data = obj.data
+            bone = armature_data.bones.get(bone_name)
+
+            if bone is None:
+                return
+
+            if not uses_bone_collections(armature_data):
+                assign_bone_to_layer_group(obj, bone_name, 27)
+                return
+
+            target_collection = get_or_create_extra_group_collection(armature_data, group_name, ui_row)
+
+            for collection in armature_data.collections_all:
+                try:
+                    collection.unassign(bone)
+                except RuntimeError:
+                    pass
+
+            target_collection.assign(bone)
+
+        def apply_extra_group_collections(obj, extra_group_ui_rows: dict[str, int]) -> list[str]:
+            if obj is None or obj.type != "ARMATURE" or not uses_bone_collections(obj.data):
+                return []
+
+            assigned_collection_names: list[str] = []
+
+            for source_bone_name, data in self.context.extra_bone_data.items():
+                if not data.get("needs_new_merge_bone", False):
+                    continue
+
+                group_name = sanitize_extra_group_name(data.get("whitelist_group_name", "Additional"))
+                ui_row = extra_group_ui_rows.get(group_name)
+
+                if ui_row is None:
+                    continue
+
+                collection_name = extra_group_collection_name(group_name)
+                candidate_bone_names = [
+                    data.get("constraint_target"),
+                    source_bone_name,
+                    data.get("merge_target"),
+                ]
+
+                for candidate_bone_name in dict.fromkeys(name for name in candidate_bone_names if name):
+                    if obj.data.bones.get(candidate_bone_name) is None:
+                        continue
+
+                    assign_bone_to_extra_group_collection(obj, candidate_bone_name, group_name, ui_row)
+
+                    if collection_name not in assigned_collection_names:
+                        assigned_collection_names.append(collection_name)
+
+                    break
+
+            return assigned_collection_names
+
+        def set_visible_rig_layers(obj, layer_indices, extra_collection_names=()) -> None:
             armature_data = obj.data
 
             if uses_bone_collections(armature_data):
-                visible_collections = {
-                    get_collection_name(layer_index)
-                    for layer_index in layer_indices
-                }
-
+                visible_collections = {get_collection_name(layer_index) for layer_index in layer_indices}
                 visible_collections.update(extra_collection_names)
 
                 for collection in armature_data.collections_all:
@@ -392,8 +822,6 @@ class RigifyBauModus:
             if layer_index is None:
                 return
 
-            collection_name = get_collection_name(layer_index)
-
             coll_refs_name = f"{attr_name}_coll_refs"
             coll_refs = getattr(rigify_param, coll_refs_name, None)
 
@@ -401,10 +829,9 @@ class RigifyBauModus:
                 while len(coll_refs):
                     coll_refs.remove(len(coll_refs) - 1)
 
-                bone_collection = obj.data.collections_all.get(collection_name)
-                if bone_collection is not None:
-                    coll_refs.add().set_collection(bone_collection)
-
+                coll_refs.add().set_collection(
+                    get_or_create_bone_collection(obj.data, layer_index)
+                )
                 return
 
             if not hasattr(rigify_param, attr_name):
@@ -420,17 +847,16 @@ class RigifyBauModus:
                     layer_config[layer_index] = True
 
         def make_bone(
-                obj,
-                bone_name: str,
-                bone_parent: str | None = None,
-                head=(0.0, 0.0, 0.0),
-                tail=(0.5, 0.0, 0.0),
+            obj,
+            bone_name: str,
+            bone_parent: str | None = None,
+            head=(0.0, 0.0, 0.0),
+            tail=(0.5, 0.0, 0.0),
         ):
             if not bone_name:
                 return None
 
             ensure_mode(obj, "EDIT")
-
             edit_bones = obj.data.edit_bones
             existing_bone = edit_bones.get(bone_name)
 
@@ -448,25 +874,15 @@ class RigifyBauModus:
 
         def average_vectors(vectors):
             vectors = [vector for vector in vectors if vector is not None]
-
-            if not vectors:
-                return None
-
-            return sum(vectors, Vector()) / len(vectors)
+            return None if not vectors else sum(vectors, Vector()) / len(vectors)
 
         def average_bone_points(bones, attr_name: str = "tail"):
-            vectors = [getattr(bone, attr_name).copy() for bone in bones]
-
-            return average_vectors(vectors)
+            return average_vectors([getattr(bone, attr_name).copy() for bone in bones])
 
         def get_rotation_diff(source_pose_bone, source_obj, target_pose_bone, target_obj):
             source_world_matrix = source_obj.matrix_world @ source_pose_bone.matrix
             target_world_matrix = target_obj.matrix_world @ target_pose_bone.matrix
-
-            source_rotation = source_world_matrix.to_quaternion()
-            target_rotation = target_world_matrix.to_quaternion()
-
-            return source_rotation, target_rotation
+            return source_world_matrix.to_quaternion(), target_world_matrix.to_quaternion()
 
         def remove_constraint_if_present(pose_bone, constraint_name: str) -> None:
             constraint = pose_bone.constraints.get(constraint_name)
@@ -475,15 +891,15 @@ class RigifyBauModus:
                 pose_bone.constraints.remove(constraint)
 
         def create_constraint(
-                owner_pose_bone,
-                owner_obj,
-                target_bone_name: str,
-                target_obj,
-                rotation,
-                rot_order: str = "XYZ",
-                copy_loc: bool = False,
-                copy_stretch_location: bool = False,
-                transform_space: str = "WORLD",
+            owner_pose_bone,
+            owner_obj,
+            target_bone_name: str,
+            target_obj,
+            rotation,
+            rot_order: str = "XYZ",
+            copy_loc: bool = False,
+            copy_stretch_location: bool = False,
+            transform_space: str = "WORLD",
         ) -> None:
             remove_constraint_if_present(owner_pose_bone, "H2R Copy Rotation")
             remove_constraint_if_present(owner_pose_bone, "H2R Root Rotation Offset")
@@ -529,12 +945,10 @@ class RigifyBauModus:
             return parameters.get(name, default)
 
         ensure_rigify_enabled()
-
         bpy.context.scene.cursor.location = (0.0, 0.0, 0.0)
 
         external_obj = skeleton_model
         external_name = external_obj.name
-
         make_object_active(external_obj)
 
         target_rig_name = f"{external_name}_rigify"
@@ -546,7 +960,6 @@ class RigifyBauModus:
         head = safe_param("head")
         first_neck = safe_param("first_neck")
         last_neck = safe_param("last_neck") or first_neck
-
         first_spine = safe_param("first_spine")
         last_spine = safe_param("last_spine") or first_spine
 
@@ -673,14 +1086,13 @@ class RigifyBauModus:
             left_fingers = []
 
         derived_data = getattr(self.context, "derived_bones", {}) or {}
-
         spine_data = derived_data.get("spines", {})
         all_spines = list(spine_data.get("all_spines", []))
 
         if not all_spines:
             all_spines = [first_spine]
-
             current = external_obj.data.bones.get(last_spine)
+
             while current is not None:
                 all_spines.append(current.name)
 
@@ -697,11 +1109,7 @@ class RigifyBauModus:
         if last_spine not in all_spines:
             all_spines.append(last_spine)
 
-        second_spine = (
-                spine_data.get("second_spine")
-                or (all_spines[1] if len(all_spines) > 1 else first_spine)
-        )
-
+        second_spine = spine_data.get("second_spine") or (all_spines[1] if len(all_spines) > 1 else first_spine)
         less_spine_bones = len(all_spines) <= 2
 
         neck_data = derived_data.get("necks", {})
@@ -745,14 +1153,10 @@ class RigifyBauModus:
         # ------------------------------------------------------------
 
         ensure_mode(external_obj, "EDIT")
-
         first_spine_edit = external_obj.data.edit_bones[first_spine]
         second_spine_edit = external_obj.data.edit_bones.get(second_spine) or first_spine_edit
 
-        transformation_target = make_bone(
-            external_obj,
-            "skeleton:TransformationTarget",
-        )
+        make_bone(external_obj, "skeleton:TransformationTarget")
 
         torso_start = first_spine_edit.head.copy()
         torso_end = second_spine_edit.head.copy()
@@ -760,15 +1164,12 @@ class RigifyBauModus:
         if torso_start == torso_end:
             torso_end = second_spine_edit.tail.copy()
 
-        torso_head = (torso_start + torso_end) / 2.0
-        torso_tail = second_spine_edit.tail.copy()
-
         make_bone(
             external_obj,
             "skeleton:torso_bone",
             first_spine,
-            torso_head,
-            torso_tail,
+            (torso_start + torso_end) / 2.0,
+            second_spine_edit.tail.copy(),
         )
 
         if copy_loc_constr:
@@ -791,8 +1192,6 @@ class RigifyBauModus:
         for edit_bone in list(metarig_obj.data.edit_bones):
             metarig_obj.data.edit_bones.remove(edit_bone)
 
-        all_external_bone_names = get_all_bone_names(external_obj, "DATA")
-
         whitelisted_extra_bones = {
             bone_name
             for bone_name, data in self.context.extra_bone_data.items()
@@ -804,7 +1203,6 @@ class RigifyBauModus:
             for value in parameters.values()
             if isinstance(value, str) and value
         }
-
         standard_source_bones.update(all_spines)
         standard_source_bones.update(all_necks)
 
@@ -816,17 +1214,10 @@ class RigifyBauModus:
             "skeleton:torso_bone",
         }
 
-        allowed_metarig_bones = (
-                standard_source_bones
-                | whitelisted_extra_bones
-                | generated_helper_bones
-        )
+        allowed_metarig_bones = standard_source_bones | whitelisted_extra_bones | generated_helper_bones
 
-        for bone_name in all_external_bone_names:
-            if bone_name in excluded_bones_to_create:
-                continue
-
-            if bone_name not in allowed_metarig_bones:
+        for bone_name in get_all_bone_names(external_obj, "DATA"):
+            if bone_name in excluded_bones_to_create or bone_name not in allowed_metarig_bones:
                 continue
 
             source_bone = external_obj.data.bones.get(bone_name)
@@ -834,15 +1225,12 @@ class RigifyBauModus:
             if source_bone is None:
                 continue
 
-            head_world = external_obj.matrix_world @ source_bone.head_local
-            tail_world = external_obj.matrix_world @ source_bone.tail_local
-
             make_bone(
                 metarig_obj,
                 bone_name,
                 None,
-                head_world,
-                tail_world,
+                external_obj.matrix_world @ source_bone.head_local,
+                external_obj.matrix_world @ source_bone.tail_local,
             )
 
         make_bone(metarig_obj, "new_torso")
@@ -854,19 +1242,12 @@ class RigifyBauModus:
         ensure_mode(metarig_obj, "EDIT")
 
         if not heel_r and not heel_l:
-            generated_heels = {
-                "heel_r": foot_r,
-                "heel_l": foot_l,
-            }
-
+            generated_heels = {"heel_r": foot_r, "heel_l": foot_l}
             heel_r = "heel_r"
             heel_l = "heel_l"
 
             for heel_name, parent_name in generated_heels.items():
-                if not parent_name:
-                    continue
-
-                if parent_name not in metarig_obj.data.edit_bones:
+                if not parent_name or parent_name not in metarig_obj.data.edit_bones:
                     continue
 
                 heel_bone = make_bone(metarig_obj, heel_name)
@@ -891,79 +1272,69 @@ class RigifyBauModus:
         parenting_bones = {}
 
         def add_parent(child, parent, use_connect: bool) -> None:
-            if not child:
-                return
-
-            parenting_bones[child] = [parent, use_connect]
+            if child:
+                parenting_bones[child] = [parent, use_connect]
 
         add_parent(head, last_neck, True)
         add_parent(first_neck, last_spine, False)
         add_parent(second_spine, first_spine, True)
 
-        add_parent(thigh_l, first_spine, False)
-        add_parent(thigh_r, first_spine, False)
-        add_parent(calf_r, thigh_r, True)
-        add_parent(foot_r, calf_r, True)
-        add_parent(toe_r, foot_r, True)
-        add_parent(calf_l, thigh_l, True)
-        add_parent(foot_l, calf_l, True)
-        add_parent(toe_l, foot_l, True)
-
-        add_parent(clav_r, last_spine, False)
-        add_parent(uparm_r, clav_r, False)
-        add_parent(lowarm_r, uparm_r, True)
-        add_parent(hand_r, lowarm_r, True)
-
-        add_parent(clav_l, last_spine, False)
-        add_parent(uparm_l, clav_l, False)
-        add_parent(lowarm_l, uparm_l, True)
-        add_parent(hand_l, lowarm_l, True)
+        for child, parent, connected in [
+            (thigh_l, first_spine, False),
+            (thigh_r, first_spine, False),
+            (calf_r, thigh_r, True),
+            (foot_r, calf_r, True),
+            (toe_r, foot_r, True),
+            (calf_l, thigh_l, True),
+            (foot_l, calf_l, True),
+            (toe_l, foot_l, True),
+            (clav_r, last_spine, False),
+            (uparm_r, clav_r, False),
+            (lowarm_r, uparm_r, True),
+            (hand_r, lowarm_r, True),
+            (clav_l, last_spine, False),
+            (uparm_l, clav_l, False),
+            (lowarm_l, uparm_l, True),
+            (hand_l, lowarm_l, True),
+        ]:
+            add_parent(child, parent, connected)
 
         finger_parenting = {
             palm_pinky_r: [hand_r, False],
             pinky_01_r: [palm_pinky_r or hand_r, False],
             pinky_02_r: [pinky_01_r, True],
             pinky_03_r: [pinky_02_r, True],
-
             palm_ring_r: [hand_r, False],
             ring_01_r: [palm_ring_r or hand_r, False],
             ring_02_r: [ring_01_r, True],
             ring_03_r: [ring_02_r, True],
-
             palm_middle_r: [hand_r, False],
             middle_01_r: [palm_middle_r or hand_r, False],
             middle_02_r: [middle_01_r, True],
             middle_03_r: [middle_02_r, True],
-
             palm_index_r: [hand_r, False],
             index_01_r: [palm_index_r or hand_r, False],
             index_02_r: [index_01_r, True],
             index_03_r: [index_02_r, True],
-
             thumb_01_r: [hand_r, False],
             thumb_02_r: [thumb_01_r, True],
             thumb_03_r: [thumb_02_r, True],
-
             palm_pinky_l: [hand_l, False],
             pinky_01_l: [palm_pinky_l or hand_l, False],
             pinky_02_l: [pinky_01_l, True],
             pinky_03_l: [pinky_02_l, True],
-
             palm_ring_l: [hand_l, False],
             ring_01_l: [palm_ring_l or hand_l, False],
             ring_02_l: [ring_01_l, True],
             ring_03_l: [ring_02_l, True],
-
             palm_middle_l: [hand_l, False],
             middle_01_l: [palm_middle_l or hand_l, False],
             middle_02_l: [middle_01_l, True],
             middle_03_l: [middle_02_l, True],
-
             palm_index_l: [hand_l, False],
             index_01_l: [palm_index_l or hand_l, False],
             index_02_l: [index_01_l, True],
             index_03_l: [index_02_l, True],
-
             thumb_01_l: [hand_l, False],
             thumb_02_l: [thumb_01_l, True],
             thumb_03_l: [thumb_02_l, True],
@@ -978,10 +1349,8 @@ class RigifyBauModus:
         ensure_mode(metarig_obj, "EDIT")
         metarig_edit_bones = metarig_obj.data.edit_bones
         all_metarig_edit_names = {bone.name for bone in metarig_edit_bones}
-
         first_spine_bone = metarig_edit_bones.get(first_spine)
         second_spine_bone = metarig_edit_bones.get(second_spine)
-
         hip_spine_bool = False
         second_spine_head_copy = None
 
@@ -1014,15 +1383,11 @@ class RigifyBauModus:
             if not child_name or not parent_name:
                 continue
 
-            if child_name not in all_metarig_edit_names:
-                continue
-
-            if parent_name not in all_metarig_edit_names:
+            if child_name not in all_metarig_edit_names or parent_name not in all_metarig_edit_names:
                 continue
 
             child_bone = metarig_edit_bones[child_name]
             parent_bone = metarig_edit_bones[parent_name]
-
             child_bone.parent = parent_bone
 
             if parent_name in exclude_align:
@@ -1035,28 +1400,18 @@ class RigifyBauModus:
 
             child_bone.use_connect = use_connect
 
-        # Roll der übernommenen Whitelist-Zusatzknochen vom Original übernehmen.
         for bone_name in whitelisted_extra_bones:
-            copy_edit_bone_roll_from_source(
-                external_obj,
-                metarig_obj,
-                bone_name,
-            )
+            copy_edit_bone_roll_from_source(external_obj, metarig_obj, bone_name)
 
-        if (
-                hip_spine_bool
-                and less_spine_bones
-                and second_spine_bone is not None
-                and second_spine_head_copy is not None
-        ):
+        if hip_spine_bool and less_spine_bones and second_spine_bone is not None and second_spine_head_copy is not None:
             second_spine_bone.head = second_spine_head_copy
 
         if (
-                not hip_spine_bool
-                and less_spine_bones
-                and len(all_spines) == 2
-                and first_spine_bone is not None
-                and second_spine_head_copy is not None
+            not hip_spine_bool
+            and less_spine_bones
+            and len(all_spines) == 2
+            and first_spine_bone is not None
+            and second_spine_head_copy is not None
         ):
             first_spine_bone.tail = second_spine_head_copy
 
@@ -1064,30 +1419,7 @@ class RigifyBauModus:
         # Zusatzknochen bestimmen
         # ------------------------------------------------------------
 
-        generated_helper_bones = {
-            "heel_l",
-            "heel_r",
-            "new_torso",
-            "skeleton:TransformationTarget",
-            "skeleton:torso_bone",
-        }
-
-        mapped_bone_names = {
-            value
-            for value in parameters.values()
-            if isinstance(value, str) and value
-        }
-
-        mapped_bone_names.update(generated_helper_bones)
-        mapped_bone_names.update(all_spines)
-        mapped_bone_names.update(all_necks)
-
-        all_skeleton_pose_bone_names = get_all_bone_names(external_obj, "DATA")
-
         extra_bones = sorted(whitelisted_extra_bones)
-
-        ensure_mode(metarig_obj, "EDIT")
-        all_metarig_edit_names = {bone.name for bone in metarig_obj.data.edit_bones}
 
         for bone_name in extra_bones:
             if bone_name not in metarig_obj.data.edit_bones:
@@ -1110,46 +1442,28 @@ class RigifyBauModus:
 
         ensure_mode(metarig_obj, "EDIT")
 
-        hand_l_bone = metarig_obj.data.edit_bones.get(hand_l)
-        hand_r_bone = metarig_obj.data.edit_bones.get(hand_r)
+        for hand_name, thumb_name, finger_roots, fingers_bool in [
+            (hand_l, thumb_01_l, [pinky_01_l, ring_01_l, middle_01_l, index_01_l], fingers_bool_l),
+            (hand_r, thumb_01_r, [pinky_01_r, ring_01_r, middle_01_r, index_01_r], fingers_bool_r),
+        ]:
+            hand_bone = metarig_obj.data.edit_bones.get(hand_name)
 
-        if hand_l_bone is not None:
-            hand_l_children = [
-                child
-                for child in hand_l_bone.children
-                if child.name != thumb_01_l
-            ]
+            if hand_bone is None:
+                continue
 
-            if not hand_l_children:
-                hand_l_children = [
+            children = [child for child in hand_bone.children if child.name != thumb_name]
+
+            if not children:
+                children = [
                     metarig_obj.data.edit_bones[name]
-                    for name in [pinky_01_l, ring_01_l, middle_01_l, index_01_l]
+                    for name in finger_roots
                     if name in metarig_obj.data.edit_bones
                 ]
 
-            median = average_bone_points(hand_l_children, "head")
+            median = average_bone_points(children, "head")
 
-            if fingers_bool_l and median is not None:
-                hand_l_bone.tail = median
-
-        if hand_r_bone is not None:
-            hand_r_children = [
-                child
-                for child in hand_r_bone.children
-                if child.name != thumb_01_r
-            ]
-
-            if not hand_r_children:
-                hand_r_children = [
-                    metarig_obj.data.edit_bones[name]
-                    for name in [pinky_01_r, ring_01_r, middle_01_r, index_01_r]
-                    if name in metarig_obj.data.edit_bones
-                ]
-
-            median = average_bone_points(hand_r_children, "head")
-
-            if fingers_bool_r and median is not None:
-                hand_r_bone.tail = median
+            if fingers_bool and median is not None:
+                hand_bone.tail = median
 
         # ------------------------------------------------------------
         # Hand-Orientierung ohne Finger grob reparieren
@@ -1166,15 +1480,11 @@ class RigifyBauModus:
             if has_fingers:
                 continue
 
-            if hand_name not in metarig_obj.data.edit_bones:
-                continue
-
-            if parent_arm_name not in metarig_obj.data.edit_bones:
+            if hand_name not in metarig_obj.data.edit_bones or parent_arm_name not in metarig_obj.data.edit_bones:
                 continue
 
             hand_bone = metarig_obj.data.edit_bones[hand_name]
             parent_arm_bone = metarig_obj.data.edit_bones[parent_arm_name]
-
             original_length = parent_arm_bone.length
             parent_arm_bone.length *= 1.5
             hand_bone.tail = parent_arm_bone.tail.copy()
@@ -1198,22 +1508,13 @@ class RigifyBauModus:
         ]
 
         for finger_name in last_finger_bones:
-            if not finger_name:
-                continue
-
-            if finger_name not in metarig_obj.data.edit_bones:
+            if not finger_name or finger_name not in metarig_obj.data.edit_bones:
                 continue
 
             metarig_finger = metarig_obj.data.edit_bones[finger_name]
             source_finger = external_obj.data.bones.get(finger_name)
 
-            if source_finger is None:
-                continue
-
-            if source_finger.children:
-                continue
-
-            if metarig_finger.children:
+            if source_finger is None or source_finger.children or metarig_finger.children:
                 continue
 
             for mesh_obj in self.context.bound_meshes:
@@ -1222,13 +1523,11 @@ class RigifyBauModus:
                 if vertex_group is None:
                     continue
 
-                weighted_vectors = []
-
-                for vertex in mesh_obj.data.vertices:
-                    if vertex_group.index not in [group.group for group in vertex.groups]:
-                        continue
-
-                    weighted_vectors.append(mesh_obj.matrix_world @ vertex.co)
+                weighted_vectors = [
+                    mesh_obj.matrix_world @ vertex.co
+                    for vertex in mesh_obj.data.vertices
+                    if vertex_group.index in {group.group for group in vertex.groups}
+                ]
 
                 median = average_vectors(weighted_vectors)
 
@@ -1253,12 +1552,7 @@ class RigifyBauModus:
             if thumb_name in all_fingers_but_thumbs:
                 all_fingers_but_thumbs.remove(thumb_name)
 
-        all_fingers_but_thumbs = [
-            finger_name
-            for finger_name in all_fingers_but_thumbs
-            if finger_name
-        ]
-
+        all_fingers_but_thumbs = [finger_name for finger_name in all_fingers_but_thumbs if finger_name]
         metarig_obj.data.show_axes = True
 
         for finger_name in all_fingers_but_thumbs:
@@ -1275,10 +1569,7 @@ class RigifyBauModus:
         for finger_name in all_fingers_but_thumbs:
             pose_bone = metarig_obj.pose.bones.get(finger_name)
 
-            if pose_bone is None:
-                continue
-
-            if hasattr(pose_bone.rigify_parameters, "primary_rotation_axis"):
+            if pose_bone is not None and hasattr(pose_bone.rigify_parameters, "primary_rotation_axis"):
                 pose_bone.rigify_parameters.primary_rotation_axis = "X"
 
         # ------------------------------------------------------------
@@ -1291,21 +1582,18 @@ class RigifyBauModus:
             clav_r: "basic.super_copy",
             uparm_r: "limbs.super_limb",
             uparm_l: "limbs.super_limb",
-
             palm_index_r: "limbs.super_palm",
             pinky_01_r: "limbs.super_finger",
             ring_01_r: "limbs.super_finger",
             middle_01_r: "limbs.super_finger",
             index_01_r: "limbs.super_finger",
             thumb_01_r: "limbs.super_finger",
-
             palm_index_l: "limbs.super_palm",
             pinky_01_l: "limbs.super_finger",
             ring_01_l: "limbs.super_finger",
             middle_01_l: "limbs.super_finger",
             index_01_l: "limbs.super_finger",
             thumb_01_l: "limbs.super_finger",
-
             first_spine: "spines.basic_spine",
             thigh_l: "limbs.leg",
             thigh_r: "limbs.leg",
@@ -1321,15 +1609,11 @@ class RigifyBauModus:
         all_metarig_pose_names = get_all_bone_names(metarig_obj, "POSE")
 
         for bone_name, rig_type in rigify_types.items():
-            if not bone_name:
-                continue
-
-            if bone_name not in all_metarig_pose_names:
+            if not bone_name or bone_name not in all_metarig_pose_names:
                 continue
 
             pose_bone = metarig_obj.pose.bones[bone_name]
             pose_bone.rigify_type = rig_type
-
             rigify_param = pose_bone.rigify_parameters
 
             if bone_name in {thigh_r, thigh_l} and hasattr(rigify_param, "extra_ik_toe"):
@@ -1342,32 +1626,27 @@ class RigifyBauModus:
                 rigify_param.super_copy_widget_type = "shoulder"
 
         # ------------------------------------------------------------
-        # Bone Collections / Layer
+        # Bone Collections / Layer im Metarig
         # ------------------------------------------------------------
 
         layer_bones = {
             head: 0,
-
             uparm_l: 7,
             lowarm_l: 7,
             hand_l: 7,
-
             uparm_r: 10,
             lowarm_r: 10,
             hand_r: 10,
-
             thigh_l: 13,
             calf_l: 13,
             foot_l: 13,
             toe_l: 13,
             heel_l: 13,
-
             thigh_r: 16,
             calf_r: 16,
             foot_r: 16,
             toe_r: 16,
             heel_r: 16,
-
             clav_r: 3,
             clav_l: 3,
             "skeleton:torso_bone": 3,
@@ -1437,8 +1716,8 @@ class RigifyBauModus:
             if bone_name in all_metarig_data_names:
                 assign_bone_to_layer_group(metarig_obj, bone_name, layer_index)
 
-        # Zusatzknochen
         ensure_mode(metarig_obj, "POSE")
+        initialisiere_standard_bone_collections(metarig_obj.data)
         metarig_extra_group_ui_rows = build_extra_group_ui_rows(metarig_obj.data)
 
         for bone_name in extra_bones:
@@ -1448,20 +1727,12 @@ class RigifyBauModus:
                 continue
 
             pose_bone.rigify_type = "basic.super_copy"
-
             extra_data = self.context.extra_bone_data.get(bone_name, {})
-            group_name = sanitize_extra_group_name(
-                extra_data.get("whitelist_group_name", "Additional")
-            )
+            group_name = sanitize_extra_group_name(extra_data.get("whitelist_group_name", "Additional"))
             ui_row = metarig_extra_group_ui_rows.get(group_name)
 
             if ui_row is not None:
-                assign_bone_to_extra_group_collection(
-                    metarig_obj,
-                    bone_name,
-                    group_name,
-                    ui_row,
-                )
+                assign_bone_to_extra_group_collection(metarig_obj, bone_name, group_name, ui_row)
             else:
                 assign_bone_to_layer_group(metarig_obj, bone_name, 27)
 
@@ -1470,7 +1741,6 @@ class RigifyBauModus:
         # ------------------------------------------------------------
 
         ensure_mode(metarig_obj, "EDIT")
-
         new_torso_bone = metarig_obj.data.edit_bones.get("new_torso")
         spine_bone = metarig_obj.data.edit_bones.get(second_spine)
         first_spine_bone = metarig_obj.data.edit_bones.get(first_spine)
@@ -1483,22 +1753,16 @@ class RigifyBauModus:
         # kleine Positionskorrektur für Arme/Beine
         # ------------------------------------------------------------
 
-        all_z = [
-            (external_obj.matrix_world @ Vector(corner)).z
-            for corner in external_obj.bound_box
-        ]
-
+        all_z = [(external_obj.matrix_world @ Vector(corner)).z for corner in external_obj.bound_box]
         skeleton_height = max(all_z) - min(all_z) if all_z else 1.0
         skeleton_height_percent = skeleton_height * 0.002
 
-        change_tail_y = {
+        for bone_name, offset in {
             uparm_l: skeleton_height_percent,
             uparm_r: skeleton_height_percent,
             thigh_l: -skeleton_height_percent,
             thigh_r: -skeleton_height_percent,
-        }
-
-        for bone_name, offset in change_tail_y.items():
+        }.items():
             if bone_name in metarig_obj.data.edit_bones:
                 metarig_obj.data.edit_bones[bone_name].tail.y += offset
 
@@ -1509,36 +1773,44 @@ class RigifyBauModus:
             first_spine_bone.head.z -= skeleton_height_percent
 
         # ------------------------------------------------------------
-        # FK / Tweak Layer
+        # IK / FK / Tweak Layer-Parameter
         # ------------------------------------------------------------
 
         ensure_mode(metarig_obj, "POSE")
 
-        fk_layer = {
-            thigh_l: [14, 15],
-            thigh_r: [17, 18],
-            uparm_r: [11, 12],
-            uparm_l: [8, 9],
-            first_spine: [4, 4],
-            first_neck: [None, 1],
+        limb_layer_params = {
+            uparm_l: {"ik_layers": 7, "fk_layers": 8, "tweak_layers": 9},
+            uparm_r: {"ik_layers": 10, "fk_layers": 11, "tweak_layers": 12},
+            thigh_l: {"ik_layers": 13, "fk_layers": 14, "tweak_layers": 15},
+            thigh_r: {"ik_layers": 16, "fk_layers": 17, "tweak_layers": 18},
+        }
+
+        for bone_name, layer_config in limb_layer_params.items():
+            if bone_name not in metarig_obj.pose.bones:
+                continue
+
+            rigify_param = metarig_obj.pose.bones[bone_name].rigify_parameters
+
+            for attr_name, layer_index in layer_config.items():
+                set_rigify_layer_param(metarig_obj, rigify_param, attr_name, layer_index)
+
+        extra_layer_params = {
+            first_spine: {"fk_layers": 4, "tweak_layers": 4},
+            first_neck: {"tweak_layers": 1},
         }
 
         for finger_name in finger_bones:
             if finger_name in all_metarig_pose_names:
-                fk_layer[finger_name] = [None, 6]
+                extra_layer_params[finger_name] = {"tweak_layers": 6}
 
-        for bone_name, layer_config in fk_layer.items():
+        for bone_name, layer_config in extra_layer_params.items():
             if bone_name not in metarig_obj.pose.bones:
                 continue
 
-            pose_bone = metarig_obj.pose.bones[bone_name]
-            rigify_param = pose_bone.rigify_parameters
+            rigify_param = metarig_obj.pose.bones[bone_name].rigify_parameters
 
-            fk_layer_index = layer_config[0]
-            tweak_layer_index = layer_config[1]
-
-            set_rigify_layer_param(metarig_obj, rigify_param, "fk_layers", fk_layer_index)
-            set_rigify_layer_param(metarig_obj, rigify_param, "tweak_layers", tweak_layer_index)
+            for attr_name, layer_index in layer_config.items():
+                set_rigify_layer_param(metarig_obj, rigify_param, attr_name, layer_index)
 
         root_pose_bone = metarig_obj.pose.bones.get("root")
 
@@ -1551,7 +1823,6 @@ class RigifyBauModus:
 
         ensure_mode(metarig_obj, "OBJECT")
         make_object_active(metarig_obj)
-
         rigify.generate.generate_rig(bpy.context, metarig_obj)
 
         rigify_obj = bpy.context.active_object
@@ -1562,15 +1833,17 @@ class RigifyBauModus:
         rigify_obj.name = target_rig_name
         rigify_obj.data.name = f"{target_rig_name}_data"
 
+        initialisiere_standard_bone_collections(rigify_obj.data)
         rigify_extra_group_ui_rows = build_extra_group_ui_rows(rigify_obj.data)
-        extra_collection_names = apply_extra_group_collections(
-            rigify_obj,
-            rigify_extra_group_ui_rows,
-        )
+        extra_collection_names = apply_extra_group_collections(rigify_obj, rigify_extra_group_ui_rows)
+
+        repariere_standard_control_collections(rigify_obj)
+        normalisiere_rigify_sichtbarkeit(rigify_obj)
+        normalisiere_rigify_standardfarben(rigify_obj)
 
         set_visible_rig_layers(
             rigify_obj,
-            [0, 3, 6, 8, 11, 14, 17, 31],
+            DEFAULT_VISIBLE_RIG_LAYER_INDICES,
             extra_collection_names,
         )
 
@@ -1596,10 +1869,14 @@ class RigifyBauModus:
             "thigh_parent_r",
             "upperarm_parent_l",
             "thigh_parent_l",
+            "upper_arm_parent.R",
+            "thigh_parent.R",
+            "upper_arm_parent.L",
+            "thigh_parent.L",
         ]:
             pose_bone = rigify_obj.pose.bones.get(ik_fk_name)
 
-            if pose_bone is not None:
+            if pose_bone is not None and "IK_FK" in pose_bone:
                 pose_bone["IK_FK"] = 0
 
         constraints_map = {}
@@ -1607,13 +1884,8 @@ class RigifyBauModus:
         for source_name, mapping in self.context.standard_constraint_map.items():
             target_name = mapping.get("constraint_target")
 
-            if not source_name or not target_name:
-                continue
-
-            constraints_map[source_name] = [
-                target_name,
-                bool(mapping.get("copy_location", False)),
-            ]
+            if source_name and target_name:
+                constraints_map[source_name] = [target_name, bool(mapping.get("copy_location", False))]
 
         for spine_name in all_spines:
             target_name = f"DEF-{spine_name}"
@@ -1635,22 +1907,17 @@ class RigifyBauModus:
         for source_name, target_config in constraints_map.items():
             target_name, copy_location = target_config
 
-            if source_name not in all_external_pose_names:
-                continue
-
-            if target_name not in all_rigify_pose_names:
+            if source_name not in all_external_pose_names or target_name not in all_rigify_pose_names:
                 continue
 
             source_pose_bone = external_obj.pose.bones[source_name]
             target_pose_bone = rigify_obj.pose.bones[target_name]
-
             source_rotation, target_rotation = get_rotation_diff(
                 source_pose_bone,
                 external_obj,
                 target_pose_bone,
                 rigify_obj,
             )
-
             rotation_diff = target_rotation.rotation_difference(source_rotation).to_euler()
 
             create_constraint(
@@ -1665,22 +1932,17 @@ class RigifyBauModus:
             )
 
         for bone_name in extra_bones:
-            if bone_name not in all_external_pose_names:
-                continue
-
-            if bone_name not in all_rigify_pose_names:
+            if bone_name not in all_external_pose_names or bone_name not in all_rigify_pose_names:
                 continue
 
             source_pose_bone = external_obj.pose.bones[bone_name]
             target_pose_bone = rigify_obj.pose.bones[bone_name]
-
             source_rotation, target_rotation = get_rotation_diff(
                 source_pose_bone,
                 external_obj,
                 target_pose_bone,
                 rigify_obj,
             )
-
             rotation_diff = target_rotation.rotation_difference(source_rotation).to_euler()
 
             create_constraint(
@@ -1695,7 +1957,7 @@ class RigifyBauModus:
             )
 
         # ------------------------------------------------------------
-        # Custom Shape Sonderfälle
+        # Custom Shape Sonderfälle + finale Normalisierung
         # ------------------------------------------------------------
 
         head_pose_bone = rigify_obj.pose.bones.get("head")
@@ -1703,14 +1965,14 @@ class RigifyBauModus:
         if head_pose_bone is not None:
             head_pose_bone.custom_shape_scale_xyz = (1.5, 1.5, 1.5)
 
-        extra_collection_names = apply_extra_group_collections(
-            rigify_obj,
-            rigify_extra_group_ui_rows,
-        )
+        extra_collection_names = apply_extra_group_collections(rigify_obj, rigify_extra_group_ui_rows)
+        repariere_standard_control_collections(rigify_obj)
+        normalisiere_rigify_sichtbarkeit(rigify_obj)
+        normalisiere_rigify_standardfarben(rigify_obj)
 
         set_visible_rig_layers(
             rigify_obj,
-            [0, 3, 6, 8, 11, 14, 17, 13, 16, 7, 10, 5, 31],
+            DEFAULT_VISIBLE_RIG_LAYER_INDICES,
             extra_collection_names,
         )
 
@@ -1721,21 +1983,24 @@ class RigifyBauModus:
         bpy.ops.object.select_all(action="DESELECT")
 
         metarig_obj.hide_set(True)
-
         external_obj.select_set(True)
         rigify_obj.select_set(True)
         bpy.context.view_layer.objects.active = external_obj
-
         ensure_mode(external_obj, "POSE")
+
+    # ============================================================
+    # Custom Shapes übernehmen
+    # ============================================================
 
     def uebernehme_custom_shapes(self, rigify_obj, target_name_key: str) -> int:
         if rigify_obj is None:
             return 0
 
-        return self.inherit_missing_custom_shapes(
-            rigify_obj,
-            target_name_key,
-        )
+        copied_count = self.inherit_missing_custom_shapes(rigify_obj, target_name_key)
+        repariere_standard_control_collections(rigify_obj)
+        normalisiere_rigify_sichtbarkeit(rigify_obj)
+        normalisiere_rigify_standardfarben(rigify_obj)
+        return copied_count
 
     def copy_bone_color(self, source_color, target_color) -> None:
         target_color.palette = source_color.palette
@@ -1744,12 +2009,7 @@ class RigifyBauModus:
             color = getattr(source_color.custom, custom_field)
             setattr(target_color.custom, custom_field, color)
 
-    def resolve_target_transform_bone(
-            self,
-            source_pose_bone,
-            rigify_obj,
-            target_name_key: str,
-    ):
+    def resolve_target_transform_bone(self, source_pose_bone, rigify_obj, target_name_key: str):
         transform_bone = getattr(source_pose_bone, "custom_shape_transform", None)
 
         if transform_bone is None:
@@ -1761,47 +2021,21 @@ class RigifyBauModus:
         transform_mapping = self.context.source_to_target_map.get(transform_bone.name)
 
         if transform_mapping is not None:
-            target_name = transform_mapping.get(target_name_key)
+            for key in (target_name_key, "constraint_target", "merge_target"):
+                target_name = transform_mapping.get(key)
 
-            if target_name and rigify_obj.pose.bones.get(target_name) is not None:
-                return rigify_obj.pose.bones[target_name]
+                if target_name and rigify_obj.pose.bones.get(target_name) is not None:
+                    return rigify_obj.pose.bones[target_name]
 
-            fallback_name = transform_mapping.get("constraint_target")
-
-            if fallback_name and rigify_obj.pose.bones.get(fallback_name) is not None:
-                return rigify_obj.pose.bones[fallback_name]
-
-            merge_name = transform_mapping.get("merge_target")
-
-            if merge_name and rigify_obj.pose.bones.get(merge_name) is not None:
-                return rigify_obj.pose.bones[merge_name]
-
-        # Nur als letzter Fallback:
-        # funktioniert für Bones, die im Rigify-Rig denselben Namen behalten.
         return rigify_obj.pose.bones.get(transform_bone.name)
 
-    def copy_custom_shape_settings(
-        self,
-        source_pose_bone,
-        target_pose_bone,
-        target_transform_bone,
-    ) -> None:
+    def copy_custom_shape_settings(self, source_pose_bone, target_pose_bone, target_transform_bone) -> None:
         target_pose_bone.custom_shape = source_pose_bone.custom_shape
-        target_pose_bone.custom_shape_translation = (
-            source_pose_bone.custom_shape_translation.copy()
-        )
-        target_pose_bone.custom_shape_rotation_euler = (
-            source_pose_bone.custom_shape_rotation_euler.copy()
-        )
-        target_pose_bone.custom_shape_scale_xyz = tuple(
-            source_pose_bone.custom_shape_scale_xyz
-        )
-        target_pose_bone.use_custom_shape_bone_size = (
-            source_pose_bone.use_custom_shape_bone_size
-        )
-        target_pose_bone.custom_shape_wire_width = (
-            source_pose_bone.custom_shape_wire_width
-        )
+        target_pose_bone.custom_shape_translation = source_pose_bone.custom_shape_translation.copy()
+        target_pose_bone.custom_shape_rotation_euler = source_pose_bone.custom_shape_rotation_euler.copy()
+        target_pose_bone.custom_shape_scale_xyz = tuple(source_pose_bone.custom_shape_scale_xyz)
+        target_pose_bone.use_custom_shape_bone_size = source_pose_bone.use_custom_shape_bone_size
+        target_pose_bone.custom_shape_wire_width = source_pose_bone.custom_shape_wire_width
         target_pose_bone.custom_shape_transform = target_transform_bone
 
     def is_generic_circle_widget(self, widget_obj) -> bool:
@@ -1809,6 +2043,7 @@ class RigifyBauModus:
             return False
 
         mesh = getattr(widget_obj, "data", None)
+
         if mesh is None or len(mesh.polygons) != 0:
             return False
 
@@ -1817,12 +2052,7 @@ class RigifyBauModus:
             and len(mesh.edges) == GENERIC_CIRCLE_WIDGET_VERTEX_COUNT
         )
 
-    def should_replace_custom_shape(
-        self,
-        source_pose_bone,
-        target_pose_bone,
-        mapping,
-    ) -> bool:
+    def should_replace_custom_shape(self, source_pose_bone, target_pose_bone, mapping) -> bool:
         if source_pose_bone.custom_shape is None:
             return False
 
@@ -1845,15 +2075,16 @@ class RigifyBauModus:
 
         for source_bone_name, mapping in self.context.source_to_target_map.items():
             target_bone_name = mapping.get(target_name_key)
+
             if not target_bone_name:
                 continue
 
             pair_key = (source_bone_name, target_bone_name)
+
             if pair_key in yielded_pairs:
                 continue
 
             yielded_pairs.add(pair_key)
-
             yield source_bone_name, target_bone_name, mapping
 
         source_root = self.source_armature.pose.bones.get(Wirbelsäule.WURZEL)
@@ -1863,13 +2094,12 @@ class RigifyBauModus:
             return
 
         pair_key = (Wirbelsäule.WURZEL, Wirbelsäule.WURZEL)
-        if pair_key in yielded_pairs:
-            return
 
-        yield Wirbelsäule.WURZEL, Wirbelsäule.WURZEL, {
-            "source_bone": Wirbelsäule.WURZEL,
-            "is_standard": False,
-        }
+        if pair_key not in yielded_pairs:
+            yield Wirbelsäule.WURZEL, Wirbelsäule.WURZEL, {
+                "source_bone": Wirbelsäule.WURZEL,
+                "is_standard": False,
+            }
 
     def inherit_missing_custom_shapes(self, rigify_obj, target_name_key: str) -> int:
         copied_count = 0
@@ -1884,11 +2114,7 @@ class RigifyBauModus:
             if source_pose_bone is None or target_pose_bone is None:
                 continue
 
-            if not self.should_replace_custom_shape(
-                source_pose_bone,
-                target_pose_bone,
-                mapping,
-            ):
+            if not self.should_replace_custom_shape(source_pose_bone, target_pose_bone, mapping):
                 continue
 
             target_transform_bone = self.resolve_target_transform_bone(
@@ -1897,20 +2123,12 @@ class RigifyBauModus:
                 target_name_key,
             )
 
-            self.copy_custom_shape_settings(
-                source_pose_bone,
-                target_pose_bone,
-                target_transform_bone,
-            )
+            self.copy_custom_shape_settings(source_pose_bone, target_pose_bone, target_transform_bone)
 
             if not mapping.get("is_standard", True):
-                self.copy_pose_transform(
-                    source_pose_bone,
-                    target_pose_bone,
-                )
-
-            self.copy_bone_color(source_pose_bone.color, target_pose_bone.color)
-            self.copy_bone_color(source_pose_bone.bone.color, target_pose_bone.bone.color)
+                self.copy_pose_transform(source_pose_bone, target_pose_bone)
+                self.copy_bone_color(source_pose_bone.color, target_pose_bone.color)
+                self.copy_bone_color(source_pose_bone.bone.color, target_pose_bone.bone.color)
 
             copied_count += 1
 
@@ -1919,41 +2137,46 @@ class RigifyBauModus:
     def copy_pose_transform(self, source_pose_bone, target_pose_bone) -> None:
         target_pose_bone.location = source_pose_bone.location.copy()
         target_pose_bone.scale = source_pose_bone.scale.copy()
-
         target_pose_bone.rotation_mode = source_pose_bone.rotation_mode
 
         if source_pose_bone.rotation_mode == "QUATERNION":
-            target_pose_bone.rotation_quaternion = (
-                source_pose_bone.rotation_quaternion.copy()
-            )
+            target_pose_bone.rotation_quaternion = source_pose_bone.rotation_quaternion.copy()
         elif source_pose_bone.rotation_mode == "AXIS_ANGLE":
-            target_pose_bone.rotation_axis_angle = (
-                source_pose_bone.rotation_axis_angle[:]
-            )
+            target_pose_bone.rotation_axis_angle = source_pose_bone.rotation_axis_angle[:]
         else:
-            target_pose_bone.rotation_euler = (
-                source_pose_bone.rotation_euler.copy()
-            )
-def ist_fk_control_bone(bone_name: str) -> bool:
-    name = bone_name.lower()
+            target_pose_bone.rotation_euler = source_pose_bone.rotation_euler.copy()
 
-    if bone_name.startswith(("DEF-", "MCH-", "ORG-")):
-        return False
-
-    return "_fk" in name or ".fk" in name or "-fk" in name
-
-
-def faerbe_fk_knochen_gruen(rig_obj) -> None:
+def verstecke_interne_rigify_knochen(rig_obj) -> None:
     if rig_obj is None or rig_obj.type != "ARMATURE":
         return
 
-    rig_obj.data.show_bone_colors = True
+    for bone in rig_obj.data.bones:
+        if ist_interner_rigify_knochen(bone.name):
+            bone.hide = True
+            bone.hide_select = True
 
-    for pose_bone in rig_obj.pose.bones:
-        if not ist_fk_control_bone(pose_bone.name):
+def entferne_interne_knochen_aus_standard_collections(rig_obj) -> None:
+    if rig_obj is None or rig_obj.type != "ARMATURE":
+        return
+
+    armature_data = rig_obj.data
+
+    if not uses_bone_collections(armature_data):
+        return
+
+    for bone in armature_data.bones:
+        if not ist_interner_rigify_knochen(bone.name):
             continue
 
-        pose_bone.color.palette = "THEME09"
-        #   pose_bone.color.custom.normal = (0.15, 0.75, 0.20)
-        #   pose_bone.color.custom.select = (0.45, 1.00, 0.45)
-        #   pose_bone.color.custom.active = (0.75, 1.00, 0.75)
+        for collection in armature_data.collections_all:
+            if collection.name not in STANDARD_COLLECTION_NAMES:
+                continue
+
+            try:
+                collection.unassign(bone)
+            except RuntimeError:
+                pass
+
+def normalisiere_rigify_sichtbarkeit(rig_obj) -> None:
+    verstecke_interne_rigify_knochen(rig_obj)
+    entferne_interne_knochen_aus_standard_collections(rig_obj)
