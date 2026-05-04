@@ -4,12 +4,6 @@ import bpy
 from bpy.types import Object,Context,Scene,Armature
 from pathlib import Path
 
-
-_MERGE_WHITELIST_INIT_SCENE = None
-_BONE_NAME_CACHE_INIT_SCENE = None
-_BONE_NAME_CACHE_INIT_ARMATURE = None
-_BONE_NAME_CACHE = {}
-
 DEFAULT_MERGE_EXTRA_BONE_WHITELIST = [
     "rig",
     "properties",
@@ -35,7 +29,6 @@ def get_current_armature(context: Context | None) -> Object | None:
 
     return None
 
-
 def get_current_bone_names(context: Context | None) -> list[str]:
     armature_obj = get_current_armature(context)
 
@@ -46,6 +39,7 @@ def get_current_bone_names(context: Context | None) -> list[str]:
         return []
 
     return [bone.name for bone in armature_obj.data.bones]
+
 def get_mapping_folder():
     mapping_folder = Path(__file__).resolve().parent / "mapping_templates"
     mapping_folder.mkdir(parents=True, exist_ok=True)

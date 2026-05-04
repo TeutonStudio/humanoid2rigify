@@ -1,8 +1,8 @@
 import bpy
 
-from ...operatoren.__operator__ import Operatoren
-from ...__methoden__ import get_current_armature, schedule_merge_whitelist_initialization
-from ..__panel__ import Panel, Panele
+from ..operatoren.__operator__ import Operatoren
+from ..__methoden__ import get_current_armature, schedule_merge_whitelist_initialization
+from .__panel__ import Panel, Panele
 
 
 class MERGE_WHITELIST_panel(Panel):

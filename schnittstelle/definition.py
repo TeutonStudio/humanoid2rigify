@@ -1,8 +1,6 @@
-import bpy
-
-from ...__eigenschaften__ import Finger, Beine, Arme, Wirbelsäule
-from ..__panel__ import Panel, Panele
-from .__methoden__ import draw_bone_prop_group, draw_single_bone_prop, draw_finger_bone_props_grouped_foldouts, draw_foldout, draw_bone_props_per_side_foldouts
+from ..__eigenschaften__ import Finger, Beine, Arme, Wirbelsäule
+from .__panel__ import Panel, Panele
+from .__methoden__ import draw_bone_prop_group, draw_finger_bone_props_grouped_foldouts, draw_foldout, draw_bone_props_per_side_foldouts
 
 
 class DEFINITION_panel(Panel):
