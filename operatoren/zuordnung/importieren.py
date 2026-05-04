@@ -5,7 +5,7 @@ from ...__methoden__ import get_mapping_folder
 from ..__operator__ import Operator, Operatoren
 
 class MappingImportOperator(Operator):
-    bl_idname = Operatoren.IMPORTIEREN
+    bl_idname = Operatoren.ZUORDNUNG_IMPORTIEREN
     bl_label = "mapping_templates_import"
     bl_options = {"REGISTER", "UNDO"}
 

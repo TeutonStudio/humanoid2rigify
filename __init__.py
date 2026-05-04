@@ -13,9 +13,9 @@ bl_info = {
 
 from . import operatoren, schnittstelle, __eigenschaften__
 _MODULES = [
+    __eigenschaften__,
     schnittstelle,
     operatoren,
-    __eigenschaften__,
 ]
 
 def register():

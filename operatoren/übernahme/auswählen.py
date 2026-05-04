@@ -6,54 +6,47 @@ from ..__operator__ import Operator, Operatoren
 
 
 class OPR_pick_merge_whitelist_bone(Operator):
-    bl_idname = Operatoren.AUSWÄHLEN
-    bl_label = "Whitelist-Knochen waehlen"
+    bl_idname = Operatoren.WHITELIST_KNOCHEN_AUSWAEHLEN.value
+    bl_label = "Whitelist-Knochen wählen"
     bl_property = "selected_bone"
 
+    group_index: bpy.props.IntProperty(default=-1)
     item_index: bpy.props.IntProperty(default=-1)
-    selected_bone: bpy.props.EnumProperty(name="Bone",items=bone_item_list)
 
-    def invoke(self, context, _event):
-        if self.item_index < 0:
+    selected_bone: bpy.props.EnumProperty(
+        name="Bone",
+        items=bone_item_list,
+    )
+
+    def invoke(self, context, event):
+        groups = context.scene.merge_extra_bone_groups
+
+        if self.group_index < 0 or self.group_index >= len(groups):
             return {"CANCELLED"}
 
-        armature = get_current_armature(context)
-        if armature is None:
-            self.report({"WARNING"}, "Keine Armature aktiv")
+        group = groups[self.group_index]
+
+        if self.item_index < 0 or self.item_index >= len(group.entries):
             return {"CANCELLED"}
 
-        whitelist = context.scene.merge_extra_bone_whitelist
+        current_value = group.entries[self.item_index].value
 
-        if self.item_index >= len(whitelist):
-            return {"CANCELLED"}
-
-        bone_names = get_current_bone_names(context)
-
-        if not bone_names:
-            self.report({"WARNING"}, "Die Armature hat keine Knochen")
-            return {"CANCELLED"}
-
-        current_value = whitelist[self.item_index].value
-
-        if current_value in bone_names:
+        if current_value:
             self.selected_bone = current_value
-        else:
-            self.selected_bone = bone_names[0]
 
-        context.window_manager.invoke_search_popup(self)
-        return {"RUNNING_MODAL"}
+        return context.window_manager.invoke_search_popup(self)
 
     def execute(self, context):
-        whitelist = context.scene.merge_extra_bone_whitelist
+        groups = context.scene.merge_extra_bone_groups
 
-        if not (0 <= self.item_index < len(whitelist)):
+        if self.group_index < 0 or self.group_index >= len(groups):
             return {"CANCELLED"}
 
-        bone_names = get_current_bone_names(context)
+        group = groups[self.group_index]
 
-        if self.selected_bone not in bone_names:
-            self.report({"WARNING"}, f"Knochen nicht gefunden: {self.selected_bone}")
+        if self.item_index < 0 or self.item_index >= len(group.entries):
             return {"CANCELLED"}
 
-        whitelist[self.item_index].value = self.selected_bone
+        group.entries[self.item_index].value = self.selected_bone
+
         return {"FINISHED"}

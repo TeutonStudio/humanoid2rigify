@@ -8,6 +8,12 @@ from bpy.types import Scene, Context, Object, UILayout
 from ..__eigenschaften__ import KnochenEnum, LRKnochenEnum, KEnum, Seite
 from ..operatoren.__operator__ import Operatoren
 
+def operatorlabel(layout: UILayout,scene: Scene,lb_text: str,property: str,operator: Operatoren,op_text: str):
+    box = layout.box()
+    box.label(text=lb_text)
+    box.prop(scene,property)
+    box.operator(operator,text=op_text)
+
 def get_selected_armature(context: Context) -> Object | None:
     active_object = context.active_object
 

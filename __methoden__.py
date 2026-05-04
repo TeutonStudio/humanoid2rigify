@@ -5,10 +5,15 @@ import bpy
 from bpy.types import Object,Context,Scene,Armature
 from pathlib import Path
 
-DEFAULT_MERGE_EXTRA_BONE_WHITELIST = [
-    "rig",
-    "properties",
-    "clothes",
+DEFAULT_MERGE_EXTRA_BONE_GROUPS = [
+    {
+        "name": "Additional",
+        "entries": [
+            "rig",
+            "properties",
+            "clothes",
+        ],
+    },
 ]
 
 def get_current_armature(context: Context | None) -> Object | None:
@@ -63,26 +68,39 @@ def get_merge_whitelist_option_values(context: Context) -> list[str]:
 
     return option_values
 
-def get_next_merge_whitelist_value(scene: Scene, context: Context) -> str:
-    existing_values = {
-        item.value
-        for item in scene.merge_extra_bone_whitelist
-        if item.value
-    }
-    for value in get_merge_whitelist_option_values(context):
-        if value not in existing_values:
-            return value
+#   def get_next_merge_whitelist_value(scene: Scene, context: Context) -> str:
+#       existing_values = {
+#           item.value
+#           for item in scene.merge_extra_bone_whitelist
+#           if item.value
+#       }
+#       for value in get_merge_whitelist_option_values(context):
+#           if value not in existing_values:
+#               return value
+#
+#       return DEFAULT_MERGE_EXTRA_BONE_WHITELIST[0]
 
-    return DEFAULT_MERGE_EXTRA_BONE_WHITELIST[0]
+#   def ensure_merge_whitelist(scene: Scene):
+#       collection = getattr(scene, "merge_extra_bone_whitelist", None)
+#       if collection is None or len(collection) != 0:
+#           return
+#
+#       for pattern in DEFAULT_MERGE_EXTRA_BONE_WHITELIST:
+#           item = collection.add()
+#           item.value = pattern
 
-def ensure_merge_whitelist(scene: Scene):
-    collection = getattr(scene, "merge_extra_bone_whitelist", None)
-    if collection is None or len(collection) != 0:
+def ensure_merge_whitelist_groups(scene) -> None:
+    if len(scene.merge_extra_bone_groups) > 0:
         return
 
-    for pattern in DEFAULT_MERGE_EXTRA_BONE_WHITELIST:
-        item = collection.add()
-        item.value = pattern
+    for group_data in DEFAULT_MERGE_EXTRA_BONE_GROUPS:
+        group = scene.merge_extra_bone_groups.add()
+        group.name = group_data["name"]
+        group.expanded = True
+
+        for value in group_data["entries"]:
+            item = group.entries.add()
+            item.value = value
 
 def initialize_pending_merge_whitelist():
     global _MERGE_WHITELIST_INIT_SCENE

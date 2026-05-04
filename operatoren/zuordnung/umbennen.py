@@ -7,7 +7,7 @@ from ..__operator__ import Operator, Operatoren
 
 
 class MappingRenameOperator(Operator):
-    bl_idname = Operatoren.UMBENNENEN
+    bl_idname = Operatoren.ZUORDNUNG_UMBENNENEN
     bl_label = "mapping_templates_rename"
     bl_options = {"REGISTER", "UNDO"}
 
