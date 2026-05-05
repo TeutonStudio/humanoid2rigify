@@ -2,7 +2,6 @@ import re
 
 import bpy
 import rigify
-
 from mathutils import Vector, Color
 
 from .kontext import GenerationContext, RIGIFY_UI_ROWS, EXTRA_GROUP_UI_START_ROW, RIGIFY_UI_TITLES, \

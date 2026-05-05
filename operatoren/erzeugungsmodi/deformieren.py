@@ -3,7 +3,7 @@ from __future__ import annotations
 import bpy
 
 from .__methoden__ import make_armature_active
-from .rigify import RigifyBauModus
+from ..rigify import RigifyBauModus
 
 
 class DeformRigErhalter(RigifyBauModus):
