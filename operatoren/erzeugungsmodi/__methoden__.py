@@ -58,7 +58,7 @@ class GenerationContext:
     extra_bone_data: dict = field(default_factory=dict)
 
 
-def create_generation_context(operator, armature_obj, params):
+def create_generation_context(operator, armature_obj, params) -> GenerationContext:
     context = GenerationContext(
         operator=operator,
         source_armature=armature_obj,
