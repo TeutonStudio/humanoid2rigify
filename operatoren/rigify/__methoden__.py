@@ -4,9 +4,10 @@ import bpy
 import rigify
 from mathutils import Vector, Color
 
+from ...__eigenschaften__ import Wirbelsäule
 from .kontext import GenerationContext, RIGIFY_UI_ROWS, EXTRA_GROUP_UI_START_ROW, RIGIFY_UI_TITLES, \
     EXTRA_GROUP_COLLECTION_PREFIX, STANDARD_LAYER_UI_ORDER, LAYER_COLLECTION_NAMES, STANDARD_COLLECTION_NAMES, \
-    INTERNAL_RIGIFY_PREFIXES, COLLECTION_LAYER_BY_NAME, FALLBACK_COLOR, FarbGattung
+    INTERNAL_RIGIFY_PREFIXES, COLLECTION_LAYER_BY_NAME, FALLBACK_COLOR, FarbGattung, GENERIC_CIRCLE_WIDGET_VERTEX_COUNT
 
 
 def convert_source_roll_axis_to_target_space(source_obj, target_obj, source_bone) -> Vector:
@@ -760,3 +761,95 @@ def get_generated_rigify_name(source_armature) -> str:
 
 def get_generated_rigify_object(source_armature):
     return bpy.data.objects.get(get_generated_rigify_name(source_armature))
+
+
+def should_replace_custom_shape(source_pose_bone, target_pose_bone, mapping) -> bool:
+    if source_pose_bone.custom_shape is None:
+        return False
+    if not mapping.get("is_standard", True) and source_pose_bone.bone.hide:
+        return False
+    if target_pose_bone.custom_shape is None:
+        return True
+    if target_pose_bone.name == Wirbelsäule.WURZEL:
+        return True
+    if not mapping.get("is_standard", True):
+        return True
+    return is_generic_circle_widget(target_pose_bone.custom_shape)
+
+def is_generic_circle_widget(widget_obj) -> bool:
+    if widget_obj is None or getattr(widget_obj, "type", None) != "MESH":
+        return False
+    mesh = getattr(widget_obj, "data", None)
+    if mesh is None or len(mesh.polygons) != 0:
+        return False
+    return (
+        len(mesh.vertices) == GENERIC_CIRCLE_WIDGET_VERTEX_COUNT
+        and len(mesh.edges) == GENERIC_CIRCLE_WIDGET_VERTEX_COUNT
+    )
+
+
+def copy_custom_shape_settings(source_pose_bone, target_pose_bone, target_transform_bone) -> None:
+    target_pose_bone.custom_shape = source_pose_bone.custom_shape
+    target_pose_bone.custom_shape_translation = source_pose_bone.custom_shape_translation.copy()
+    target_pose_bone.custom_shape_rotation_euler = source_pose_bone.custom_shape_rotation_euler.copy()
+    target_pose_bone.custom_shape_scale_xyz = tuple(source_pose_bone.custom_shape_scale_xyz)
+    target_pose_bone.use_custom_shape_bone_size = source_pose_bone.use_custom_shape_bone_size
+    target_pose_bone.custom_shape_wire_width = source_pose_bone.custom_shape_wire_width
+    target_pose_bone.custom_shape_transform = target_transform_bone
+
+
+def copy_pose_transform(source_pose_bone, target_pose_bone) -> None:
+    target_pose_bone.location = source_pose_bone.location.copy()
+    target_pose_bone.scale = source_pose_bone.scale.copy()
+    target_pose_bone.rotation_mode = source_pose_bone.rotation_mode
+    if source_pose_bone.rotation_mode == "QUATERNION":
+        target_pose_bone.rotation_quaternion = source_pose_bone.rotation_quaternion.copy()
+    elif source_pose_bone.rotation_mode == "AXIS_ANGLE":
+        target_pose_bone.rotation_axis_angle = source_pose_bone.rotation_axis_angle[:]
+    else:
+        target_pose_bone.rotation_euler = source_pose_bone.rotation_euler.copy()
+
+
+def copy_bone_color(source_color, target_color) -> None:
+    target_color.palette = source_color.palette
+    for custom_field in ("normal", "select", "active"):
+        color = getattr(source_color.custom, custom_field)
+        setattr(target_color.custom, custom_field, color)
+
+
+def iter_shape_mappings(rigify_obj, target_name_key: str,source_to_target_map,bones):
+    yielded_pairs = set()
+    for source_bone_name, mapping in source_to_target_map.items():
+        target_bone_name = mapping.get(target_name_key)
+        if not target_bone_name:
+            continue
+        pair_key = (source_bone_name, target_bone_name)
+        if pair_key in yielded_pairs:
+            continue
+        yielded_pairs.add(pair_key)
+        yield source_bone_name, target_bone_name, mapping
+    source_root = bones.get(Wirbelsäule.WURZEL)
+    target_root = rigify_obj.pose.bones.get(Wirbelsäule.WURZEL)
+    if source_root is None or target_root is None:
+        return
+    pair_key = (Wirbelsäule.WURZEL, Wirbelsäule.WURZEL)
+    if pair_key not in yielded_pairs:
+        yield Wirbelsäule.WURZEL, Wirbelsäule.WURZEL, {
+            "source_bone": Wirbelsäule.WURZEL,
+            "is_standard": False,
+        }
+
+
+def resolve_target_transform_bone(source_pose_bone, rigify_obj, target_name_key: str, source_to_target_map):
+    transform_bone = getattr(source_pose_bone, "custom_shape_transform", None)
+    if transform_bone is None:
+        return None
+    if transform_bone.name == Wirbelsäule.WURZEL:
+        return rigify_obj.pose.bones.get(Wirbelsäule.WURZEL)
+    transform_mapping = source_to_target_map.get(transform_bone.name)
+    if transform_mapping is not None:
+        for key in (target_name_key, "constraint_target", "merge_target"):
+            target_name = transform_mapping.get(key)
+            if target_name and rigify_obj.pose.bones.get(target_name) is not None:
+                return rigify_obj.pose.bones[target_name]
+    return rigify_obj.pose.bones.get(transform_bone.name)

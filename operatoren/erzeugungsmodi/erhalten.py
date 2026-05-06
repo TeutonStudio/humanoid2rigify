@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from operatoren.rigify import RigifyBauModus
+from ..rigify import RigifyBauModus
 
 
 class OriginalErhalter(RigifyBauModus):

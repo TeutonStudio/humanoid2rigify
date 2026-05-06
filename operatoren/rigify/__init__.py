@@ -6,8 +6,11 @@ from .__methoden__ import ensure_rigify_enabled, make_object_active, ensure_mode
     sanitize_extra_group_name, assign_bone_to_extra_group_collection, set_rigify_layer_param, \
     apply_extra_group_collections, repariere_standard_control_collections, normalisiere_rigify_sichtbarkeit, \
     normalisiere_rigify_standardfarben, set_visible_rig_layers, get_rotation_diff, create_constraint, \
-    erhalte_generiertes_rigify_rig, get_generated_rigify_object, copy_edit_bone_roll_from_source, average_bone_points
+    erhalte_generiertes_rigify_rig, get_generated_rigify_object, copy_edit_bone_roll_from_source, average_bone_points, \
+    should_replace_custom_shape, copy_custom_shape_settings, copy_pose_transform, copy_bone_color, iter_shape_mappings, \
+    resolve_target_transform_bone
 from .kontext import GenerationContext, DEFAULT_VISIBLE_RIG_LAYER_INDICES
+from .skelett import Skelett
 
 
 class RigifyBauModus:
@@ -46,16 +49,7 @@ class RigifyBauModus:
         return rigify_obj
 
     def generiere_rigify_rig(self, skeleton_model, parameters) -> None:
-        def safe_param(name: str, default=""): return parameters.get(name, default)
-
-        def require_source_bone(bone_name: str, label: str) -> None:
-            if not bone_name:
-                raise RuntimeError(f"Pflichtknochen fehlt im Mapping: {label}")
-
-            if skeleton_model.data.bones.get(bone_name) is None:
-                raise RuntimeError(
-                    f"Pflichtknochen '{bone_name}' für '{label}' existiert nicht in {skeleton_model.name}"
-                )
+        skelett = Skelett(parameters,skeleton_model)
 
         ensure_rigify_enabled()
         bpy.context.scene.cursor.location = (0.0, 0.0, 0.0)
@@ -70,170 +64,42 @@ class RigifyBauModus:
         if existing_rig is not None:
             bpy.data.objects.remove(existing_rig, do_unlink=True)
 
-        head = safe_param("head")
-        first_neck = safe_param("first_neck")
-        last_neck = safe_param("last_neck") or first_neck
-        first_spine = safe_param("first_spine")
-        last_spine = safe_param("last_spine") or first_spine
-
-        clav_r = safe_param("clav_r")
-        clav_l = safe_param("clav_l")
-        uparm_l = safe_param("uparm_l")
-        uparm_r = safe_param("uparm_r")
-        lowarm_l = safe_param("lowarm_l")
-        lowarm_r = safe_param("lowarm_r")
-        hand_l = safe_param("hand_l")
-        hand_r = safe_param("hand_r")
-
-        palm_pinky_r = safe_param("palm_pinky_r")
-        pinky_01_r = safe_param("pinky_01_r")
-        pinky_02_r = safe_param("pinky_02_r")
-        pinky_03_r = safe_param("pinky_03_r")
-        palm_ring_r = safe_param("palm_ring_r")
-        ring_01_r = safe_param("ring_01_r")
-        ring_02_r = safe_param("ring_02_r")
-        ring_03_r = safe_param("ring_03_r")
-        palm_middle_r = safe_param("palm_middle_r")
-        middle_01_r = safe_param("middle_01_r")
-        middle_02_r = safe_param("middle_02_r")
-        middle_03_r = safe_param("middle_03_r")
-        palm_index_r = safe_param("palm_index_r")
-        index_01_r = safe_param("index_01_r")
-        index_02_r = safe_param("index_02_r")
-        index_03_r = safe_param("index_03_r")
-        thumb_01_r = safe_param("thumb_01_r")
-        thumb_02_r = safe_param("thumb_02_r")
-        thumb_03_r = safe_param("thumb_03_r")
-
-        palm_pinky_l = safe_param("palm_pinky_l")
-        pinky_01_l = safe_param("pinky_01_l")
-        pinky_02_l = safe_param("pinky_02_l")
-        pinky_03_l = safe_param("pinky_03_l")
-        palm_ring_l = safe_param("palm_ring_l")
-        ring_01_l = safe_param("ring_01_l")
-        ring_02_l = safe_param("ring_02_l")
-        ring_03_l = safe_param("ring_03_l")
-        palm_middle_l = safe_param("palm_middle_l")
-        middle_01_l = safe_param("middle_01_l")
-        middle_02_l = safe_param("middle_02_l")
-        middle_03_l = safe_param("middle_03_l")
-        palm_index_l = safe_param("palm_index_l")
-        index_01_l = safe_param("index_01_l")
-        index_02_l = safe_param("index_02_l")
-        index_03_l = safe_param("index_03_l")
-        thumb_01_l = safe_param("thumb_01_l")
-        thumb_02_l = safe_param("thumb_02_l")
-        thumb_03_l = safe_param("thumb_03_l")
-
-        thigh_l = safe_param("thigh_l")
-        thigh_r = safe_param("thigh_r")
-        calf_l = safe_param("calf_l")
-        calf_r = safe_param("calf_r")
-        foot_l = safe_param("foot_l")
-        foot_r = safe_param("foot_r")
-        toe_l = safe_param("toe_l")
-        toe_r = safe_param("toe_r")
-        heel_l = safe_param("heel_l")
-        heel_r = safe_param("heel_r")
-
-        fingers_bool_r = bool(safe_param("fingers_bool_r", True))
-        fingers_bool_l = bool(safe_param("fingers_bool_l", True))
-        copy_loc_constr = bool(safe_param("copy_loc_constr", True))
-
-        require_source_bone(first_spine, "first_spine")
-        require_source_bone(last_spine, "last_spine")
-        require_source_bone(head, "head")
-
-        right_fingers = [
-            palm_pinky_r,
-            pinky_01_r,
-            pinky_02_r,
-            pinky_03_r,
-            palm_ring_r,
-            ring_01_r,
-            ring_02_r,
-            ring_03_r,
-            palm_middle_r,
-            middle_01_r,
-            middle_02_r,
-            middle_03_r,
-            palm_index_r,
-            index_01_r,
-            index_02_r,
-            index_03_r,
-            thumb_01_r,
-            thumb_02_r,
-            thumb_03_r,
-        ]
-
-        left_fingers = [
-            palm_pinky_l,
-            pinky_01_l,
-            pinky_02_l,
-            pinky_03_l,
-            palm_ring_l,
-            ring_01_l,
-            ring_02_l,
-            ring_03_l,
-            palm_middle_l,
-            middle_01_l,
-            middle_02_l,
-            middle_03_l,
-            palm_index_l,
-            index_01_l,
-            index_02_l,
-            index_03_l,
-            thumb_01_l,
-            thumb_02_l,
-            thumb_03_l,
-        ]
-
-        excluded_bones_to_create = set()
-
-        if not fingers_bool_r:
-            excluded_bones_to_create.update(bone for bone in right_fingers if bone)
-            right_fingers = []
-
-        if not fingers_bool_l:
-            excluded_bones_to_create.update(bone for bone in left_fingers if bone)
-            left_fingers = []
-
         derived_data = getattr(self.context, "derived_bones", {}) or {}
         spine_data = derived_data.get("spines", {})
         all_spines = list(spine_data.get("all_spines", []))
 
         if not all_spines:
-            all_spines = [first_spine]
-            current = external_obj.data.bones.get(last_spine)
+            all_spines = [skelett.first_spine]
+            current = external_obj.data.bones.get(skelett.last_spine)
 
             while current is not None:
                 all_spines.append(current.name)
 
-                if current.name == first_spine:
+                if current.name == skelett.first_spine:
                     break
 
                 current = current.parent
 
             all_spines = list(reversed(list(dict.fromkeys(all_spines))))
 
-        if first_spine not in all_spines:
-            all_spines.insert(0, first_spine)
+        if skelett.first_spine not in all_spines:
+            all_spines.insert(0,skelett.first_spine)
 
-        if last_spine not in all_spines:
-            all_spines.append(last_spine)
+        if skelett.last_spine not in all_spines:
+            all_spines.append(skelett.last_spine)
 
-        second_spine = spine_data.get("second_spine") or (all_spines[1] if len(all_spines) > 1 else first_spine)
+        second_spine = spine_data.get("second_spine") or (all_spines[1] if len(all_spines) > 1 else skelett.first_spine)
         less_spine_bones = len(all_spines) <= 2
 
         neck_data = derived_data.get("necks", {})
         all_necks = list(neck_data.get("all_necks", []))
 
-        if not all_necks and first_neck:
-            all_necks = [first_neck]
+        if not all_necks and skelett.first_neck:
+            all_necks = [skelett.first_neck]
 
         if all_necks:
-            first_neck = all_necks[0]
-            last_neck = all_necks[-1]
+            skelett.first_neck = all_necks[0]
+            skelett.last_neck = all_necks[-1]
 
         spine_parenting = {}
         all_spines_set = set(all_spines)
@@ -266,7 +132,7 @@ class RigifyBauModus:
         # ------------------------------------------------------------
 
         ensure_mode(external_obj, "EDIT")
-        first_spine_edit = external_obj.data.edit_bones[first_spine]
+        first_spine_edit = external_obj.data.edit_bones[skelett.first_spine]
         second_spine_edit = external_obj.data.edit_bones.get(second_spine) or first_spine_edit
 
         make_bone(external_obj, "skeleton:TransformationTarget")
@@ -280,12 +146,12 @@ class RigifyBauModus:
         make_bone(
             external_obj,
             "skeleton:torso_bone",
-            first_spine,
+            skelett.first_spine,
             (torso_start + torso_end) / 2.0,
             second_spine_edit.tail.copy(),
         )
 
-        if copy_loc_constr:
+        if skelett.copy_loc_constr:
             for edit_bone in external_obj.data.edit_bones:
                 edit_bone.inherit_scale = "NONE"
 
@@ -330,7 +196,7 @@ class RigifyBauModus:
         allowed_metarig_bones = standard_source_bones | whitelisted_extra_bones | generated_helper_bones
 
         for bone_name in get_all_bone_names(external_obj, "DATA"):
-            if bone_name in excluded_bones_to_create or bone_name not in allowed_metarig_bones:
+            if bone_name in skelett.excluded_bones_to_create or bone_name not in allowed_metarig_bones:
                 continue
 
             source_bone = external_obj.data.bones.get(bone_name)
@@ -354,8 +220,8 @@ class RigifyBauModus:
 
         ensure_mode(metarig_obj, "EDIT")
 
-        if not heel_r and not heel_l:
-            generated_heels = {"heel_r": foot_r, "heel_l": foot_l}
+        if not skelett.heel_r and not skelett.heel_l:
+            generated_heels = {"heel_r": skelett.foot_r, "heel_l": skelett.foot_l}
             heel_r = "heel_r"
             heel_l = "heel_l"
 
@@ -385,75 +251,16 @@ class RigifyBauModus:
         parenting_bones = {}
 
         def add_parent(child, parent, use_connect: bool) -> None:
-            if child:
-                parenting_bones[child] = [parent, use_connect]
+            if child: parenting_bones[child] = [parent, use_connect]
 
-        add_parent(head, last_neck, True)
-        add_parent(first_neck, last_spine, False)
-        add_parent(second_spine, first_spine, True)
+        add_parent(skelett.head, skelett.last_neck, True)
+        add_parent(skelett.first_neck, skelett.last_spine, False)
+        add_parent(second_spine, skelett.first_spine, True)
 
-        for child, parent, connected in [
-            (thigh_l, first_spine, False),
-            (thigh_r, first_spine, False),
-            (calf_r, thigh_r, True),
-            (foot_r, calf_r, True),
-            (toe_r, foot_r, True),
-            (calf_l, thigh_l, True),
-            (foot_l, calf_l, True),
-            (toe_l, foot_l, True),
-            (clav_r, last_spine, False),
-            (uparm_r, clav_r, False),
-            (lowarm_r, uparm_r, True),
-            (hand_r, lowarm_r, True),
-            (clav_l, last_spine, False),
-            (uparm_l, clav_l, False),
-            (lowarm_l, uparm_l, True),
-            (hand_l, lowarm_l, True),
-        ]:
+        for child, parent, connected in skelett.parenting_list():
             add_parent(child, parent, connected)
 
-        finger_parenting = {
-            palm_pinky_r: [hand_r, False],
-            pinky_01_r: [palm_pinky_r or hand_r, False],
-            pinky_02_r: [pinky_01_r, True],
-            pinky_03_r: [pinky_02_r, True],
-            palm_ring_r: [hand_r, False],
-            ring_01_r: [palm_ring_r or hand_r, False],
-            ring_02_r: [ring_01_r, True],
-            ring_03_r: [ring_02_r, True],
-            palm_middle_r: [hand_r, False],
-            middle_01_r: [palm_middle_r or hand_r, False],
-            middle_02_r: [middle_01_r, True],
-            middle_03_r: [middle_02_r, True],
-            palm_index_r: [hand_r, False],
-            index_01_r: [palm_index_r or hand_r, False],
-            index_02_r: [index_01_r, True],
-            index_03_r: [index_02_r, True],
-            thumb_01_r: [hand_r, False],
-            thumb_02_r: [thumb_01_r, True],
-            thumb_03_r: [thumb_02_r, True],
-            palm_pinky_l: [hand_l, False],
-            pinky_01_l: [palm_pinky_l or hand_l, False],
-            pinky_02_l: [pinky_01_l, True],
-            pinky_03_l: [pinky_02_l, True],
-            palm_ring_l: [hand_l, False],
-            ring_01_l: [palm_ring_l or hand_l, False],
-            ring_02_l: [ring_01_l, True],
-            ring_03_l: [ring_02_l, True],
-            palm_middle_l: [hand_l, False],
-            middle_01_l: [palm_middle_l or hand_l, False],
-            middle_02_l: [middle_01_l, True],
-            middle_03_l: [middle_02_l, True],
-            palm_index_l: [hand_l, False],
-            index_01_l: [palm_index_l or hand_l, False],
-            index_02_l: [index_01_l, True],
-            index_03_l: [index_02_l, True],
-            thumb_01_l: [hand_l, False],
-            thumb_02_l: [thumb_01_l, True],
-            thumb_03_l: [thumb_02_l, True],
-        }
-
-        for child, parent_config in finger_parenting.items():
+        for child, parent_config in skelett.finger_parenting_list().items():
             add_parent(child, parent_config[0], parent_config[1])
 
         parenting_bones.update(spine_parenting)
@@ -462,7 +269,7 @@ class RigifyBauModus:
         ensure_mode(metarig_obj, "EDIT")
         metarig_edit_bones = metarig_obj.data.edit_bones
         all_metarig_edit_names = {bone.name for bone in metarig_edit_bones}
-        first_spine_bone = metarig_edit_bones.get(first_spine)
+        first_spine_bone = metarig_edit_bones.get(skelett.first_spine)
         second_spine_bone = metarig_edit_bones.get(second_spine)
         hip_spine_bool = False
         second_spine_head_copy = None
@@ -478,17 +285,17 @@ class RigifyBauModus:
                 first_spine_bone.tail = first_spine_head
 
         exclude_align = {
-            first_spine: second_spine,
-            last_spine: first_neck,
-            palm_index_l: index_01_l,
-            palm_index_r: index_01_r,
-            hand_l: None,
-            hand_r: None,
-            head: None,
+            skelett.first_spine: second_spine,
+            skelett.last_spine: skelett.first_neck,
+            skelett.palm_index_l: skelett.index_01_l,
+            skelett.palm_index_r: skelett.index_01_r,
+            skelett.hand_l: None,
+            skelett.hand_r: None,
+            skelett.head: None,
         }
 
         if less_spine_bones:
-            exclude_align[first_spine] = None
+            exclude_align[skelett.first_spine] = None
 
         for child_name, parent_config in parenting_bones.items():
             parent_name, use_connect = parent_config
@@ -556,8 +363,8 @@ class RigifyBauModus:
         ensure_mode(metarig_obj, "EDIT")
 
         for hand_name, thumb_name, finger_roots, fingers_bool in [
-            (hand_l, thumb_01_l, [pinky_01_l, ring_01_l, middle_01_l, index_01_l], fingers_bool_l),
-            (hand_r, thumb_01_r, [pinky_01_r, ring_01_r, middle_01_r, index_01_r], fingers_bool_r),
+            (skelett.hand_l, skelett.thumb_01_l, [skelett.pinky_01_l, skelett.ring_01_l, skelett.middle_01_l, skelett.index_01_l], skelett.fingers_bool_l),
+            (skelett.hand_r, skelett.thumb_01_r, [skelett.pinky_01_r, skelett.ring_01_r, skelett.middle_01_r, skelett.index_01_r], skelett.fingers_bool_r),
         ]:
             hand_bone = metarig_obj.data.edit_bones.get(hand_name)
 
@@ -583,8 +390,8 @@ class RigifyBauModus:
         # ------------------------------------------------------------
 
         hands_orient = {
-            hand_r: [lowarm_r, fingers_bool_r],
-            hand_l: [lowarm_l, fingers_bool_l],
+            skelett.hand_r: [skelett.lowarm_r, skelett.fingers_bool_r],
+            skelett.hand_l: [skelett.lowarm_l, skelett.fingers_bool_l],
         }
 
         for hand_name, orient_config in hands_orient.items():
@@ -607,20 +414,7 @@ class RigifyBauModus:
         # Letzte Fingerknochen anhand Vertex Groups verlängern
         # ------------------------------------------------------------
 
-        last_finger_bones = [
-            pinky_03_r,
-            ring_03_r,
-            middle_03_r,
-            index_03_r,
-            thumb_03_r,
-            pinky_03_l,
-            ring_03_l,
-            middle_03_l,
-            index_03_l,
-            thumb_03_l,
-        ]
-
-        for finger_name in last_finger_bones:
+        for finger_name in skelett.finger_end_list():
             if not finger_name or finger_name not in metarig_obj.data.edit_bones:
                 continue
 
@@ -652,19 +446,7 @@ class RigifyBauModus:
         # Finger-Roll
         # ------------------------------------------------------------
 
-        all_fingers_but_thumbs = list(dict.fromkeys(right_fingers + left_fingers))
-
-        for thumb_name in [
-            thumb_01_r,
-            thumb_02_r,
-            thumb_03_r,
-            thumb_01_l,
-            thumb_02_l,
-            thumb_03_l,
-        ]:
-            if thumb_name in all_fingers_but_thumbs:
-                all_fingers_but_thumbs.remove(thumb_name)
-
+        all_fingers_but_thumbs = skelett.finger_list_no_thumb()
         all_fingers_but_thumbs = [finger_name for finger_name in all_fingers_but_thumbs if finger_name]
         metarig_obj.data.show_axes = True
 
@@ -689,35 +471,14 @@ class RigifyBauModus:
         # Rigify-Typen setzen
         # ------------------------------------------------------------
 
-        rigify_types = {
-            first_neck: "spines.super_head",
-            clav_l: "basic.super_copy",
-            clav_r: "basic.super_copy",
-            uparm_r: "limbs.super_limb",
-            uparm_l: "limbs.super_limb",
-            palm_index_r: "limbs.super_palm",
-            pinky_01_r: "limbs.super_finger",
-            ring_01_r: "limbs.super_finger",
-            middle_01_r: "limbs.super_finger",
-            index_01_r: "limbs.super_finger",
-            thumb_01_r: "limbs.super_finger",
-            palm_index_l: "limbs.super_palm",
-            pinky_01_l: "limbs.super_finger",
-            ring_01_l: "limbs.super_finger",
-            middle_01_l: "limbs.super_finger",
-            index_01_l: "limbs.super_finger",
-            thumb_01_l: "limbs.super_finger",
-            first_spine: "spines.basic_spine",
-            thigh_l: "limbs.leg",
-            thigh_r: "limbs.leg",
-        }
+        rigify_types = skelett.rigify_types()
 
         if less_spine_bones:
             for spine_name in all_spines:
                 rigify_types[spine_name] = "basic.super_copy"
 
-            rigify_types[first_neck] = "basic.super_copy"
-            rigify_types[head] = "basic.super_copy"
+            rigify_types[skelett.first_neck] = "basic.super_copy"
+            rigify_types[skelett.head] = "basic.super_copy"
 
         all_metarig_pose_names = get_all_bone_names(metarig_obj, "POSE")
 
@@ -729,13 +490,13 @@ class RigifyBauModus:
             pose_bone.rigify_type = rig_type
             rigify_param = pose_bone.rigify_parameters
 
-            if bone_name in {thigh_r, thigh_l} and hasattr(rigify_param, "extra_ik_toe"):
+            if bone_name in {skelett.thigh_r, skelett.thigh_l} and hasattr(rigify_param, "extra_ik_toe"):
                 rigify_param.extra_ik_toe = True
 
-            if bone_name == last_neck and hasattr(rigify_param, "connect_chain"):
+            if bone_name == skelett.last_neck and hasattr(rigify_param, "connect_chain"):
                 rigify_param.connect_chain = True
 
-            if bone_name in {clav_r, clav_l} and hasattr(rigify_param, "super_copy_widget_type"):
+            if bone_name in {skelett.clav_r, skelett.clav_l} and hasattr(rigify_param, "super_copy_widget_type"):
                 rigify_param.super_copy_widget_type = "shoulder"
 
         # ------------------------------------------------------------
@@ -743,28 +504,28 @@ class RigifyBauModus:
         # ------------------------------------------------------------
 
         layer_bones = {
-            head: 0,
-            uparm_l: 7,
-            lowarm_l: 7,
-            hand_l: 7,
-            uparm_r: 10,
-            lowarm_r: 10,
-            hand_r: 10,
-            thigh_l: 13,
-            calf_l: 13,
-            foot_l: 13,
-            toe_l: 13,
-            heel_l: 13,
-            thigh_r: 16,
-            calf_r: 16,
-            foot_r: 16,
-            toe_r: 16,
-            heel_r: 16,
-            clav_r: 3,
-            clav_l: 3,
+            skelett.head: 0,
+            skelett.uparm_l: 7,
+            skelett.lowarm_l: 7,
+            skelett.hand_l: 7,
+            skelett.uparm_r: 10,
+            skelett.lowarm_r: 10,
+            skelett.hand_r: 10,
+            skelett.thigh_l: 13,
+            skelett.calf_l: 13,
+            skelett.foot_l: 13,
+            skelett.toe_l: 13,
+            skelett.heel_l: 13,
+            skelett.thigh_r: 16,
+            skelett.calf_r: 16,
+            skelett.foot_r: 16,
+            skelett.toe_r: 16,
+            skelett.heel_r: 16,
+            skelett.clav_r: 3,
+            skelett.clav_l: 3,
             "skeleton:torso_bone": 3,
             "new_torso": 3,
-            first_neck: 3,
+            skelett.first_neck: 3,
         }
 
         for spine_name in all_spines:
@@ -773,55 +534,16 @@ class RigifyBauModus:
         for neck_name in all_necks:
             layer_bones[neck_name] = 3
 
-        finger_bones = [
-            palm_pinky_r,
-            pinky_01_r,
-            pinky_02_r,
-            pinky_03_r,
-            palm_ring_r,
-            ring_01_r,
-            ring_02_r,
-            ring_03_r,
-            palm_middle_r,
-            middle_01_r,
-            middle_02_r,
-            middle_03_r,
-            palm_index_r,
-            index_01_r,
-            index_02_r,
-            index_03_r,
-            thumb_01_r,
-            thumb_02_r,
-            thumb_03_r,
-            palm_pinky_l,
-            pinky_01_l,
-            pinky_02_l,
-            pinky_03_l,
-            palm_ring_l,
-            ring_01_l,
-            ring_02_l,
-            ring_03_l,
-            palm_middle_l,
-            middle_01_l,
-            middle_02_l,
-            middle_03_l,
-            palm_index_l,
-            index_01_l,
-            index_02_l,
-            index_03_l,
-            thumb_01_l,
-            thumb_02_l,
-            thumb_03_l,
-        ]
+        finger_bones = skelett.finger_list_all()
 
         for bone_name in finger_bones:
             if bone_name:
                 layer_bones[bone_name] = 5
 
         if less_spine_bones:
-            layer_bones[first_spine] = 3
-            layer_bones[first_neck] = 3
-            layer_bones[head] = 3
+            layer_bones[skelett.first_spine] = 3
+            layer_bones[skelett.first_neck] = 3
+            layer_bones[skelett.head] = 3
 
         all_metarig_data_names = set(get_all_bone_names(metarig_obj, "DATA"))
 
@@ -831,7 +553,7 @@ class RigifyBauModus:
 
         ensure_mode(metarig_obj, "POSE")
         initialisiere_standard_bone_collections(metarig_obj.data)
-        metarig_extra_group_ui_rows = build_extra_group_ui_rows(metarig_obj.data)
+        metarig_extra_group_ui_rows = build_extra_group_ui_rows(self.context,metarig_obj.data)
 
         for bone_name in extra_bones:
             pose_bone = metarig_obj.pose.bones.get(bone_name)
@@ -856,7 +578,7 @@ class RigifyBauModus:
         ensure_mode(metarig_obj, "EDIT")
         new_torso_bone = metarig_obj.data.edit_bones.get("new_torso")
         spine_bone = metarig_obj.data.edit_bones.get(second_spine)
-        first_spine_bone = metarig_obj.data.edit_bones.get(first_spine)
+        first_spine_bone = metarig_obj.data.edit_bones.get(skelett.first_spine)
 
         if new_torso_bone is not None and spine_bone is not None and first_spine_bone is not None:
             new_torso_bone.tail = (first_spine_bone.head + first_spine_bone.tail) / 2.0
@@ -871,15 +593,15 @@ class RigifyBauModus:
         skeleton_height_percent = skeleton_height * 0.002
 
         for bone_name, offset in {
-            uparm_l: skeleton_height_percent,
-            uparm_r: skeleton_height_percent,
-            thigh_l: -skeleton_height_percent,
-            thigh_r: -skeleton_height_percent,
+            skelett.uparm_l: skeleton_height_percent,
+            skelett.uparm_r: skeleton_height_percent,
+            skelett.thigh_l: -skeleton_height_percent,
+            skelett.thigh_r: -skeleton_height_percent,
         }.items():
             if bone_name in metarig_obj.data.edit_bones:
                 metarig_obj.data.edit_bones[bone_name].tail.y += offset
 
-        first_spine_bone = metarig_obj.data.edit_bones.get(first_spine)
+        first_spine_bone = metarig_obj.data.edit_bones.get(skelett.first_spine)
 
         if hip_spine_bool and first_spine_bone is not None:
             first_spine_bone.head = first_spine_bone.tail.copy()
@@ -892,10 +614,10 @@ class RigifyBauModus:
         ensure_mode(metarig_obj, "POSE")
 
         limb_layer_params = {
-            uparm_l: {"ik_layers": 7, "fk_layers": 8, "tweak_layers": 9},
-            uparm_r: {"ik_layers": 10, "fk_layers": 11, "tweak_layers": 12},
-            thigh_l: {"ik_layers": 13, "fk_layers": 14, "tweak_layers": 15},
-            thigh_r: {"ik_layers": 16, "fk_layers": 17, "tweak_layers": 18},
+            skelett.uparm_l: {"ik_layers": 7, "fk_layers": 8, "tweak_layers": 9},
+            skelett.uparm_r: {"ik_layers": 10, "fk_layers": 11, "tweak_layers": 12},
+            skelett.thigh_l: {"ik_layers": 13, "fk_layers": 14, "tweak_layers": 15},
+            skelett.thigh_r: {"ik_layers": 16, "fk_layers": 17, "tweak_layers": 18},
         }
 
         for bone_name, layer_config in limb_layer_params.items():
@@ -908,8 +630,8 @@ class RigifyBauModus:
                 set_rigify_layer_param(metarig_obj, rigify_param, attr_name, layer_index)
 
         extra_layer_params = {
-            first_spine: {"fk_layers": 4, "tweak_layers": 4},
-            first_neck: {"tweak_layers": 1},
+            skelett.first_spine: {"fk_layers": 4, "tweak_layers": 4},
+            skelett.first_neck: {"tweak_layers": 1},
         }
 
         for finger_name in finger_bones:
@@ -943,8 +665,8 @@ class RigifyBauModus:
         rigify_obj.data.name = f"{target_rig_name}_data"
 
         initialisiere_standard_bone_collections(rigify_obj.data)
-        rigify_extra_group_ui_rows = build_extra_group_ui_rows(rigify_obj.data)
-        extra_collection_names = apply_extra_group_collections(rigify_obj, rigify_extra_group_ui_rows)
+        rigify_extra_group_ui_rows = build_extra_group_ui_rows(self.context,rigify_obj.data)
+        extra_collection_names = apply_extra_group_collections(self.context,rigify_obj, rigify_extra_group_ui_rows)
 
         repariere_standard_control_collections(rigify_obj)
         normalisiere_rigify_sichtbarkeit(rigify_obj)
@@ -1037,7 +759,7 @@ class RigifyBauModus:
                 rotation_diff,
                 rotation_diff.order,
                 copy_location,
-                copy_loc_constr,
+                skelett.copy_loc_constr,
             )
 
         for bone_name in extra_bones:
@@ -1074,7 +796,7 @@ class RigifyBauModus:
         if head_pose_bone is not None:
             head_pose_bone.custom_shape_scale_xyz = (1.5, 1.5, 1.5)
 
-        extra_collection_names = apply_extra_group_collections(rigify_obj, rigify_extra_group_ui_rows)
+        extra_collection_names = apply_extra_group_collections(self.context,rigify_obj, rigify_extra_group_ui_rows)
         repariere_standard_control_collections(rigify_obj)
         normalisiere_rigify_sichtbarkeit(rigify_obj)
         normalisiere_rigify_standardfarben(rigify_obj)
@@ -1096,3 +818,41 @@ class RigifyBauModus:
         rigify_obj.select_set(True)
         bpy.context.view_layer.objects.active = external_obj
         ensure_mode(external_obj, "POSE")
+
+    def uebernehme_custom_shapes(self, rigify_obj, target_name_key: str) -> int:
+        if rigify_obj is None:
+         return 0
+
+        copied_count = self.inherit_missing_custom_shapes(rigify_obj, target_name_key)
+        repariere_standard_control_collections(rigify_obj)
+        normalisiere_rigify_sichtbarkeit(rigify_obj)
+        normalisiere_rigify_standardfarben(rigify_obj)
+        return copied_count
+
+    def inherit_missing_custom_shapes(self, rigify_obj, target_name_key: str) -> int:
+        copied_count = 0
+        for source_bone_name, target_bone_name, mapping in iter_shape_mappings(
+            rigify_obj,
+            target_name_key,
+            self.context.source_to_target_map,
+            self.source_armature.pose.bones,
+        ):
+            source_pose_bone = self.source_armature.pose.bones.get(source_bone_name)
+            target_pose_bone = rigify_obj.pose.bones.get(target_bone_name)
+            if source_pose_bone is None or target_pose_bone is None:
+                continue
+            if not should_replace_custom_shape(source_pose_bone, target_pose_bone, mapping):
+                continue
+            target_transform_bone = resolve_target_transform_bone(
+                source_pose_bone,
+                rigify_obj,
+                target_name_key,
+                self.context.source_to_target_map
+            )
+            copy_custom_shape_settings(source_pose_bone, target_pose_bone, target_transform_bone)
+            if not mapping.get("is_standard", True):
+                copy_pose_transform(source_pose_bone, target_pose_bone)
+                copy_bone_color(source_pose_bone.color, target_pose_bone.color)
+                copy_bone_color(source_pose_bone.bone.color, target_pose_bone.bone.color)
+            copied_count += 1
+        return copied_count

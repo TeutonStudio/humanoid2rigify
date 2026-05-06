@@ -42,10 +42,10 @@ class GenerationContext:
     extra_bones: list = field(default_factory=list)
     extra_bone_data: dict = field(default_factory=dict)
 
-
 INTERNAL_RIGIFY_PREFIXES = ("DEF-", "MCH-", "ORG-")
 EXTRA_GROUP_COLLECTION_PREFIX = "Extra"
 EXTRA_GROUP_UI_START_ROW = 18
+GENERIC_CIRCLE_WIDGET_VERTEX_COUNT = 32
 
 LAYER_COLLECTION_NAMES = {
     0: "Face",

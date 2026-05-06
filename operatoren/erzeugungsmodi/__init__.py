@@ -2,7 +2,7 @@ from __future__ import annotations
 import bpy
 from bpy.types import Object
 
-from ...operatoren.erzeugungsmodi.backup import create_backups
+from .backup import create_backups
 from ...__eigenschaften__ import ErzeugungsModus
 
 
