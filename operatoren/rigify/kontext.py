@@ -74,7 +74,7 @@ LAYER_COLLECTION_NAMES = {
     17: "Leg.R (FK)",
     18: "Leg.R (Tweak)",
 
-    27: "Additional",
+    #   27: "Additional",
     31: "Root",
 }
 
@@ -158,7 +158,7 @@ RIGIFY_UI_TITLES = {
     15: "Tweak",
     18: "Tweak",
 
-    27: "Additional",
+    #   27: "Additional",
     31: "Root",
 }
 
@@ -186,7 +186,7 @@ STANDARD_LAYER_UI_ORDER = [
     18,
 
     31,
-    27,
+    #   27,
 ]
 
 DEFAULT_VISIBLE_RIG_LAYER_INDICES = [
