@@ -853,3 +853,37 @@ def resolve_target_transform_bone(source_pose_bone, rigify_obj, target_name_key:
             if target_name and rigify_obj.pose.bones.get(target_name) is not None:
                 return rigify_obj.pose.bones[target_name]
     return rigify_obj.pose.bones.get(transform_bone.name)
+
+
+def setze_objekt_im_vordergrund(obj, enabled: bool = True) -> None:
+    if obj is None:
+        return
+
+    obj.show_in_front = enabled
+
+def finde_layer_collection(root_layer_collection, target_collection):
+    if root_layer_collection.collection == target_collection:
+        return root_layer_collection
+
+    for child in root_layer_collection.children:
+        found = finde_layer_collection(child, target_collection)
+
+        if found is not None:
+            return found
+
+    return None
+
+def setze_collection_exclude_from_scene_layers(collection, enabled: bool = True, scene=None) -> None:
+    if collection is None:
+        return
+
+    scene = scene or bpy.context.scene
+
+    for view_layer in scene.view_layers:
+        layer_collection = finde_layer_collection(
+            view_layer.layer_collection,
+            collection,
+        )
+
+        if layer_collection is not None:
+            layer_collection.exclude = enabled

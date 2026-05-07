@@ -3,6 +3,7 @@ import bpy
 from bpy.types import Object
 
 from .backup import create_backups
+from ..rigify.__methoden__ import setze_collection_exclude_from_scene_layers
 from ...__eigenschaften__ import ErzeugungsModus
 
 
@@ -94,6 +95,7 @@ class RigifyBauer:
 
         if modus.needs_backup:
             create_backups(context)
+            setze_collection_exclude_from_scene_layers(context.backup_collection, True)
 
         return modus_klasse(context).erzeuge()
 
