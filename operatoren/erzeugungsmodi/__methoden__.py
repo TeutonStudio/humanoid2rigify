@@ -420,8 +420,14 @@ def collect_bound_meshes(armature_obj):
 
     return meshes
 
-def collect_weighted_vertex_group_names(mesh_objects):
-    weighted_group_names = set()
+MIN_VERTEX_GROUP_WEIGHT = 1.0e-8
+
+
+def collect_weighted_vertex_group_names(
+    mesh_objects,
+    min_weight: float = MIN_VERTEX_GROUP_WEIGHT,
+) -> set[str]:
+    weighted_group_names: set[str] = set()
 
     for mesh_obj in mesh_objects:
         index_to_name = {
@@ -431,11 +437,15 @@ def collect_weighted_vertex_group_names(mesh_objects):
 
         for vertex in mesh_obj.data.vertices:
             for group in vertex.groups:
+                if group.weight <= min_weight:
+                    continue
+
                 group_name = index_to_name.get(group.group)
                 if group_name:
                     weighted_group_names.add(group_name)
 
     return weighted_group_names
+
 
 def is_generated_rigify_rig(armature_obj):
     if armature_obj is None or armature_obj.type != "ARMATURE":

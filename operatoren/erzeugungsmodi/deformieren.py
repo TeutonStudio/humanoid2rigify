@@ -39,6 +39,10 @@ class DeformRigErhalter(RigifyBauModus):
             )
             return False
 
+        self.report(
+            {"INFO"},
+            f"Behalte {len(keep_bones)} gewichtete Deform-Knochen: {sorted(keep_bones)}",
+        )
         removed_bones = self.delete_non_keep_bones(keep_bones)
 
         bpy.ops.object.mode_set(mode="OBJECT")
@@ -69,10 +73,18 @@ class DeformRigErhalter(RigifyBauModus):
 
         edit_bones = self.source_armature.data.edit_bones
 
+        for edit_bone in list(edit_bones):
+            if edit_bone.name not in keep_bones:
+                continue
+
+            if edit_bone.parent is not None and edit_bone.parent.name not in keep_bones:
+                edit_bone.use_connect = False
+                edit_bone.parent = None
+
         removable_bones = [
-            bone.name
-            for bone in edit_bones
-            if bone.name not in keep_bones
+            edit_bone.name
+            for edit_bone in edit_bones
+            if edit_bone.name not in keep_bones
         ]
 
         for bone_name in removable_bones:
@@ -81,6 +93,24 @@ class DeformRigErhalter(RigifyBauModus):
                 edit_bones.remove(edit_bone)
 
         return removable_bones
+
+    # def delete_non_keep_bones(self, keep_bones: set[str]) -> list[str]:
+    #     bpy.ops.object.mode_set(mode="EDIT")
+    #
+    #     edit_bones = self.source_armature.data.edit_bones
+    #
+    #     removable_bones = [
+    #         bone.name
+    #         for bone in edit_bones
+    #         if bone.name not in keep_bones
+    #     ]
+    #
+    #     for bone_name in removable_bones:
+    #         edit_bone = edit_bones.get(bone_name)
+    #         if edit_bone is not None:
+    #             edit_bones.remove(edit_bone)
+    #
+    #     return removable_bones
 
     def normalize_deform_flags(self, weighted_deform_bones: set[str]) -> None:
         for bone in self.source_armature.data.bones:
@@ -117,20 +147,23 @@ class DeformRigErhalter(RigifyBauModus):
         return subtargets
 
     def compute_deform_mode_keep_bones(self) -> set[str]:
-        weighted_deform_bones = set(self.context.used_deform_bones)
-        if not weighted_deform_bones:
-            return set()
+        return set(self.context.used_deform_bones)
 
-        keep_bones = set(weighted_deform_bones)
-        keep_bones.update(
-            self.collect_bone_ancestors(weighted_deform_bones),
-        )
-
-        constraint_helpers = self.collect_constraint_subtargets(keep_bones)
-
-        keep_bones.update(constraint_helpers)
-        keep_bones.update(
-            self.collect_bone_ancestors(constraint_helpers),
-        )
-
-        return keep_bones
+    # def compute_deform_mode_keep_bones(self) -> set[str]:
+    #     weighted_deform_bones = set(self.context.used_deform_bones)
+    #     if not weighted_deform_bones:
+    #         return set()
+    #
+    #     keep_bones = set(weighted_deform_bones)
+    #     keep_bones.update(
+    #         self.collect_bone_ancestors(weighted_deform_bones),
+    #     )
+    #
+    #     constraint_helpers = self.collect_constraint_subtargets(keep_bones)
+    #
+    #     keep_bones.update(constraint_helpers)
+    #     keep_bones.update(
+    #         self.collect_bone_ancestors(constraint_helpers),
+    #     )
+    #
+    #     return keep_bones
