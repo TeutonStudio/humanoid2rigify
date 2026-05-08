@@ -8,7 +8,7 @@ from .__methoden__ import ensure_rigify_enabled, make_object_active, ensure_mode
     normalisiere_rigify_standardfarben, set_visible_rig_layers, get_rotation_diff, create_constraint, \
     erhalte_generiertes_rigify_rig, get_generated_rigify_object, copy_edit_bone_roll_from_source, average_bone_points, \
     should_replace_custom_shape, copy_custom_shape_settings, copy_pose_transform, copy_bone_color, iter_shape_mappings, \
-    resolve_target_transform_bone, setze_objekt_im_vordergrund
+    resolve_target_transform_bone, setze_objekt_im_vordergrund, copy_whitelist_bone_drivers
 from .kontext import GenerationContext, DEFAULT_VISIBLE_RIG_LAYER_INDICES
 from .skelett import Skelett
 
@@ -672,6 +672,18 @@ class RigifyBauModus:
         repariere_standard_control_collections(rigify_obj)
         normalisiere_rigify_sichtbarkeit(rigify_obj)
         normalisiere_rigify_standardfarben(rigify_obj)
+
+        copied_driver_count = copy_whitelist_bone_drivers(
+            self.context,
+            rigify_obj,
+            "constraint_target",
+        )
+
+        if copied_driver_count:
+            self.report(
+                {"INFO"},
+                f"{copied_driver_count} Driver von Whitelist-Knochen übernommen.",
+            )
 
         set_visible_rig_layers(
             rigify_obj,

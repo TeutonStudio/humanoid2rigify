@@ -887,3 +887,275 @@ def setze_collection_exclude_from_scene_layers(collection, enabled: bool = True,
 
         if layer_collection is not None:
             layer_collection.exclude = enabled
+
+def copy_id_properties(source_owner, target_owner) -> None:
+    if source_owner is None or target_owner is None:
+        return
+
+    if not hasattr(source_owner, "keys"):
+        return
+
+    for key in source_owner.keys():
+        if key == "_RNA_UI":
+            continue
+
+        try:
+            target_owner[key] = source_owner[key]
+        except (TypeError, ValueError, RuntimeError):
+            pass
+
+
+def build_pose_bone_path_map(source_obj, target_obj, bone_name_map: dict[str, str]) -> dict[str, str]:
+    path_map: dict[str, str] = {}
+
+    for source_bone_name, target_bone_name in bone_name_map.items():
+        source_pose_bone = source_obj.pose.bones.get(source_bone_name)
+        target_pose_bone = target_obj.pose.bones.get(target_bone_name)
+
+        if source_pose_bone is None or target_pose_bone is None:
+            continue
+
+        path_map[source_pose_bone.path_from_id()] = target_pose_bone.path_from_id()
+
+    return path_map
+
+
+def remap_data_path(data_path: str, path_map: dict[str, str]) -> str:
+    if not data_path:
+        return data_path
+
+    for source_path, target_path in sorted(
+        path_map.items(),
+        key=lambda item: len(item[0]),
+        reverse=True,
+    ):
+        if (
+            data_path == source_path
+            or data_path.startswith(f"{source_path}.")
+            or data_path.startswith(f"{source_path}[")
+        ):
+            return f"{target_path}{data_path[len(source_path):]}"
+
+    return data_path
+
+
+def copy_driver_target(
+    source_target,
+    target_target,
+    source_obj,
+    target_obj,
+    bone_name_map: dict[str, str],
+    path_map: dict[str, str],
+) -> None:
+    for attr_name in (
+        "id_type",
+        "transform_type",
+        "transform_space",
+        "rotation_mode",
+    ):
+        if not hasattr(source_target, attr_name) or not hasattr(target_target, attr_name):
+            continue
+
+        try:
+            setattr(target_target, attr_name, getattr(source_target, attr_name))
+        except (TypeError, ValueError, RuntimeError):
+            pass
+
+    try:
+        if source_target.id == source_obj:
+            target_target.id = target_obj
+        elif source_target.id == source_obj.data:
+            target_target.id = target_obj.data
+        else:
+            target_target.id = source_target.id
+    except (TypeError, ValueError, RuntimeError):
+        pass
+
+    if hasattr(source_target, "bone_target") and hasattr(target_target, "bone_target"):
+        source_bone_target = getattr(source_target, "bone_target", "")
+        target_target.bone_target = bone_name_map.get(source_bone_target, source_bone_target)
+
+    if hasattr(source_target, "data_path") and hasattr(target_target, "data_path"):
+        target_target.data_path = remap_data_path(
+            getattr(source_target, "data_path", ""),
+            path_map,
+        )
+
+
+def copy_driver_variables(
+    source_driver,
+    target_driver,
+    source_obj,
+    target_obj,
+    bone_name_map: dict[str, str],
+    path_map: dict[str, str],
+) -> None:
+    while len(target_driver.variables):
+        target_driver.variables.remove(target_driver.variables[0])
+
+    for source_variable in source_driver.variables:
+        target_variable = target_driver.variables.new()
+        target_variable.name = source_variable.name
+        target_variable.type = source_variable.type
+
+        for index, source_target in enumerate(source_variable.targets):
+            if index >= len(target_variable.targets):
+                continue
+
+            copy_driver_target(
+                source_target,
+                target_variable.targets[index],
+                source_obj,
+                target_obj,
+                bone_name_map,
+                path_map,
+            )
+
+
+def add_replacement_driver(target_obj, data_path: str, array_index: int):
+    try:
+        target_obj.driver_remove(data_path, array_index)
+    except (TypeError, ValueError, RuntimeError):
+        try:
+            target_obj.driver_remove(data_path)
+        except (TypeError, ValueError, RuntimeError):
+            pass
+
+    try:
+        return target_obj.driver_add(data_path, array_index)
+    except (TypeError, ValueError, RuntimeError):
+        return target_obj.driver_add(data_path)
+
+
+def copy_driver_fcurve(
+    source_obj,
+    target_obj,
+    source_fcurve,
+    target_data_path: str,
+    bone_name_map: dict[str, str],
+    path_map: dict[str, str],
+) -> bool:
+    try:
+        target_fcurve = add_replacement_driver(
+            target_obj,
+            target_data_path,
+            source_fcurve.array_index,
+        )
+    except (TypeError, ValueError, RuntimeError):
+        return False
+
+    target_fcurve.mute = source_fcurve.mute
+    target_fcurve.hide = source_fcurve.hide
+    target_fcurve.lock = source_fcurve.lock
+    target_fcurve.extrapolation = source_fcurve.extrapolation
+
+    source_driver = source_fcurve.driver
+    target_driver = target_fcurve.driver
+
+    target_driver.type = source_driver.type
+    target_driver.use_self = source_driver.use_self
+
+    copy_driver_variables(
+        source_driver,
+        target_driver,
+        source_obj,
+        target_obj,
+        bone_name_map,
+        path_map,
+    )
+
+    target_driver.expression = source_driver.expression
+    return True
+
+
+def copy_pose_bone_drivers_between_armatures(
+    source_obj,
+    target_obj,
+    bone_name_map: dict[str, str],
+) -> int:
+    if source_obj is None or target_obj is None:
+        return 0
+
+    if source_obj.type != "ARMATURE" or target_obj.type != "ARMATURE":
+        return 0
+
+    if source_obj.animation_data is None:
+        return 0
+
+    source_drivers = source_obj.animation_data.drivers
+    if not source_drivers:
+        return 0
+
+    valid_bone_name_map: dict[str, str] = {}
+
+    for source_bone_name, target_bone_name in bone_name_map.items():
+        source_pose_bone = source_obj.pose.bones.get(source_bone_name)
+        target_pose_bone = target_obj.pose.bones.get(target_bone_name)
+
+        if source_pose_bone is None or target_pose_bone is None:
+            continue
+
+        valid_bone_name_map[source_bone_name] = target_bone_name
+        copy_id_properties(source_pose_bone, target_pose_bone)
+
+    if not valid_bone_name_map:
+        return 0
+
+    path_map = build_pose_bone_path_map(
+        source_obj,
+        target_obj,
+        valid_bone_name_map,
+    )
+
+    copied_count = 0
+    target_obj.animation_data_create()
+
+    for source_fcurve in source_drivers:
+        target_data_path = remap_data_path(source_fcurve.data_path, path_map)
+
+        if target_data_path == source_fcurve.data_path:
+            continue
+
+        if copy_driver_fcurve(
+            source_obj,
+            target_obj,
+            source_fcurve,
+            target_data_path,
+            valid_bone_name_map,
+            path_map,
+        ):
+            copied_count += 1
+
+    return copied_count
+
+
+def copy_whitelist_bone_drivers(
+    context: GenerationContext,
+    rigify_obj,
+    target_name_key: str = "constraint_target",
+) -> int:
+    if rigify_obj is None or rigify_obj.type != "ARMATURE":
+        return 0
+
+    bone_name_map: dict[str, str] = {}
+
+    for source_bone_name, data in context.extra_bone_data.items():
+        if not data.get("needs_new_merge_bone", False):
+            continue
+
+        target_bone_name = (
+            data.get(target_name_key)
+            or data.get("constraint_target")
+            or source_bone_name
+        )
+
+        if not target_bone_name:
+            continue
+
+        bone_name_map[source_bone_name] = target_bone_name
+
+    return copy_pose_bone_drivers_between_armatures(
+        context.source_armature,
+        rigify_obj,
+        bone_name_map,
+    )

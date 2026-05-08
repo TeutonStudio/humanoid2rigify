@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import bpy
 
 from .__methoden__ import make_armature_active
@@ -146,8 +148,23 @@ class DeformRigErhalter(RigifyBauModus):
 
         return subtargets
 
+    def collect_whitelist_keep_bones(self) -> set[str]:
+        return {
+            bone_name
+            for bone_name, data in self.context.extra_bone_data.items()
+            if data.get("needs_new_merge_bone", False)
+        }
+
     def compute_deform_mode_keep_bones(self) -> set[str]:
-        return set(self.context.used_deform_bones)
+        weighted_deform_bones = set(self.context.used_deform_bones)
+        whitelist_bones = self.collect_whitelist_keep_bones()
+        driver_used_bones = self.collect_driver_used_bones()
+
+        keep_bones = set()
+        keep_bones.update(weighted_deform_bones)
+        #   keep_bones.update(whitelist_bones)
+        #   keep_bones.update(driver_used_bones)
+        return keep_bones
 
     # def compute_deform_mode_keep_bones(self) -> set[str]:
     #     weighted_deform_bones = set(self.context.used_deform_bones)
@@ -167,3 +184,89 @@ class DeformRigErhalter(RigifyBauModus):
     #     )
     #
     #     return keep_bones
+    def collect_bone_names_from_driver_path(self, data_path: str) -> set[str]:
+        if not data_path:
+            return set()
+
+        bone_names: set[str] = set()
+
+        # Findet:
+        # pose.bones["BoneName"]
+        # bones["BoneName"]
+        # data.bones["BoneName"]
+        pattern = re.compile(r'(?:pose\.)?bones\["((?:[^"\\]|\\.)*)"\]')
+
+        for match in pattern.finditer(data_path):
+            raw_name = match.group(1)
+
+            # Blender escaped in RNA-Pfaden z.B. \" und \\.
+            bone_name = raw_name.replace(r"\"", '"').replace(r"\\", "\\")
+
+            if bone_name in self.source_armature.data.bones:
+                bone_names.add(bone_name)
+
+        return bone_names
+
+    def collect_driver_used_bones_from_fcurve(self, fcurve) -> set[str]:
+        used_bones: set[str] = set()
+
+        # 1. Der Knochen, AUF dem der Driver liegt.
+        # Beispiel:
+        # pose.bones["Jaw"].location
+        # pose.bones["Tail"].constraints["Copy"].influence
+        used_bones.update(
+            self.collect_bone_names_from_driver_path(
+                getattr(fcurve, "data_path", ""),
+            )
+        )
+
+        driver = getattr(fcurve, "driver", None)
+        if driver is None:
+            return used_bones
+
+        # 2. Knochen, die in Driver-Variablen benutzt werden.
+        for variable in driver.variables:
+            for target in variable.targets:
+                target_id = getattr(target, "id", None)
+
+                # Transform-Channel-Driver benutzen oft bone_target.
+                bone_target = getattr(target, "bone_target", "")
+                if (
+                        target_id == self.source_armature
+                        and bone_target
+                        and bone_target in self.source_armature.data.bones
+                ):
+                    used_bones.add(bone_target)
+
+                # SINGLE_PROP oder andere Driver-Ziele können data_path benutzen.
+                target_data_path = getattr(target, "data_path", "")
+                if target_id in {self.source_armature, self.source_armature.data}:
+                    used_bones.update(
+                        self.collect_bone_names_from_driver_path(target_data_path)
+                    )
+
+        return used_bones
+
+    def iter_driver_fcurves_for_source_armature(self):
+        # Driver direkt auf dem Armature-Objekt.
+        animation_data = getattr(self.source_armature, "animation_data", None)
+        if animation_data is not None:
+            for fcurve in animation_data.drivers:
+                yield fcurve
+
+        # Driver auf den Armature-Daten.
+        armature_data = getattr(self.source_armature, "data", None)
+        data_animation_data = getattr(armature_data, "animation_data", None)
+        if data_animation_data is not None:
+            for fcurve in data_animation_data.drivers:
+                yield fcurve
+
+    def collect_driver_used_bones(self) -> set[str]:
+        driver_used_bones: set[str] = set()
+
+        for fcurve in self.iter_driver_fcurves_for_source_armature():
+            driver_used_bones.update(
+                self.collect_driver_used_bones_from_fcurve(fcurve)
+            )
+
+        return driver_used_bones
